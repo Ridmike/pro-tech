@@ -1,0 +1,47 @@
+{
+  "name": "protech-automobile",
+  "version": "1.0.0",
+  "description": "GarageFlow ERP - Garage Management Desktop Application",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electronmon .",
+    "build:win": "electron-builder --win",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "build": {
+    "appId": "com.garageflow.erp",
+    "productName": "GarageFlow ERP",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icons/icon.ico"
+    }
+  },
+  "keywords": [
+    "garage",
+    "erp",
+    "electron",
+    "automobile",
+    "management"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "electron": "^43.4.1",
+    "firebase": "^12.18.0",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.15.3",
+    "electronmon": "^2.0.4"
+  }
+}
