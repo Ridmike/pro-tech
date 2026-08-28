@@ -1,30 +1,73 @@
 /**
- * GarageFlow ERP - Firebase SDK Configuration & Persistence Initialization
+ * ProTech ERP - Firebase SDK Initializer & Firestore Binding
  */
 
-const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_API_KEY",
-  authDomain: "garageflow-erp.firebaseapp.com",
-  projectId: "garageflow-erp",
-  storageBucket: "garageflow-erp.firebasestorage.app",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-
-// Global Firebase Service References
 window.GarageFlowFirebase = {
   initialized: false,
   db: null,
   auth: null,
   storage: null,
 
-  init: function() {
-    console.log('[Firebase] Initializing GarageFlow Firebase Client...');
-    // Firebase SDK modules will be initialized here once credentials are bound
-    this.initialized = true;
+  init: async function() {
     const statusText = document.getElementById('firebase-status-text');
-    if (statusText) {
-      statusText.textContent = 'Firebase Ready (Offline Cache Enabled)';
+    const statusDot = document.querySelector('.status-indicator-badge .dot');
+
+    try {
+      let config = {};
+      if (window.electronAPI && window.electronAPI.getFirebaseConfig) {
+        config = await window.electronAPI.getFirebaseConfig();
+      }
+
+      if (!config.apiKey || config.apiKey === 'YOUR_FIREBASE_API_KEY') {
+        console.warn('[Firebase] Valid credentials not found in .env. Operating in Local Memory Mode.');
+        if (statusText) statusText.textContent = 'Firebase Credentials Pending';
+        if (statusDot) statusDot.style.background = '#eab308';
+        return;
+      }
+
+      if (typeof firebase !== 'undefined') {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(config);
+        }
+
+        this.db = firebase.firestore();
+        this.auth = firebase.auth();
+        this.storage = firebase.storage();
+
+        // Sign in anonymously if no active user to bypass basic auth rules
+        try {
+          if (!this.auth.currentUser) {
+            await this.auth.signInAnonymously();
+            console.log('[Firebase] Anonymous Auth Session Established');
+          }
+        } catch (authErr) {
+          console.warn('[Firebase] Anonymous Auth note:', authErr.message);
+        }
+
+        // Enable offline persistence
+        try {
+          await this.db.enablePersistence({ synchronizeTabs: true });
+          console.log('[Firebase] IndexedDB Offline Persistence Enabled.');
+        } catch (persErr) {
+          if (persErr.code === 'failed-precondition') {
+            console.warn('[Firebase] Persistence active in primary window tab.');
+          } else if (persErr.code === 'unimplemented') {
+            console.warn('[Firebase] Persistence unsupported by browser.');
+          }
+        }
+
+        this.initialized = true;
+        console.log('[Firebase] Connected to Project:', config.projectId);
+        if (statusText) statusText.textContent = `Firebase Sync Active (${config.projectId})`;
+        if (statusDot) statusDot.style.background = '#10b981';
+      } else {
+        console.error('[Firebase] SDK scripts not loaded.');
+        if (statusText) statusText.textContent = 'Firebase SDK Missing';
+      }
+    } catch (err) {
+      console.error('[Firebase] Initialization error:', err);
+      if (statusText) statusText.textContent = 'Firebase Sync Error';
+      if (statusDot) statusDot.style.background = '#ef4444';
     }
   }
 };
