@@ -34,18 +34,28 @@ window.GarageFlowBilling = {
           <td>${window.formatLKR(balance)}</td>
           <td>${statusBadge}</td>
           <td>
-            <button class="btn btn-primary btn-sm" onclick="window.GarageFlowBilling.printInvoice('${jc.id}')">Print PDF</button>
+            <button class="btn btn-primary btn-sm" onclick="window.GarageFlowBilling.downloadInvoice('${jc.id}')">⬇ Download PDF</button>
           </td>
         </tr>
       `;
     }).join('');
   },
 
-  printInvoice: function(jobId) {
-    if (window.electronAPI && window.electronAPI.printDocument) {
-      window.electronAPI.printDocument();
+  downloadInvoice: function(jobId) {
+    const jc = window.GarageFlowJobCards
+      ? window.GarageFlowJobCards.activeJobCards.find(j => j.id === jobId)
+      : null;
+
+    if (!jc) {
+      alert('Job Card data not found for this invoice.');
+      return;
+    }
+
+    if (window.ProTechPDF) {
+      window.ProTechPDF.generateInvoice(jc);
     } else {
-      window.print();
+      alert('PDF generator is still loading. Please try again in a moment.');
     }
   }
 };
+

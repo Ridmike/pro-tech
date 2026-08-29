@@ -206,6 +206,28 @@ window.GarageFlowJobCards = {
         }
       });
     });
+
+    // Download Invoice PDF Button
+    const printBtn = document.getElementById('btn-print-jc-invoice');
+    if (printBtn) {
+      printBtn.addEventListener('click', async () => {
+        if (!this.currentSelectedJobId) return;
+        const jc = this.activeJobCards.find(j => j.id === this.currentSelectedJobId);
+        if (!jc) return;
+        if (window.ProTechPDF) {
+          printBtn.textContent = 'Generating...';
+          printBtn.disabled = true;
+          try {
+            await window.ProTechPDF.generateInvoice(jc);
+          } finally {
+            printBtn.textContent = '⬇ Download Invoice PDF';
+            printBtn.disabled = false;
+          }
+        } else {
+          alert('PDF generator not loaded yet. Please wait a moment.');
+        }
+      });
+    }
   },
 
   createJobCard: async function() {
