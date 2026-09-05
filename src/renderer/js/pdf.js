@@ -342,26 +342,24 @@ window.ProTechPDF = {
     drawTotalRow('NET AMOUNT TO PAY', lkr(grandTotal), darkBlue, golden, true);
 
     // ═══════════════════════════════════════════════════════════
-    // 8. SIGNATURE BOXES
+    // 8. SIGNATURE BOXES (ANCHORED NEAR BOTTOM OF A4 PAGE)
     // ═══════════════════════════════════════════════════════════
-    y -= 10;
+    const sigY = 140;
     const sigW = 160;
     const sigH = 34;
 
-    drawRect(margin, y, sigW, sigH, rgb(0.92, 0.92, 0.92));
-    drawRectBorder(margin, y + 1, sigW, sigH, rgb(0.6, 0.6, 0.6));
-    text('......................................', margin + 20, y - 8, { color: grey, size: 8 });
-    textCenter('Prepared By', margin, y - 24, sigW, { font: boldFont, size: 8.5, color: black });
+    drawRect(margin, sigY, sigW, sigH, rgb(0.92, 0.92, 0.92));
+    drawRectBorder(margin, sigY, sigW, sigH, rgb(0.6, 0.6, 0.6));
+    text('......................................', margin + 20, sigY - 8, { color: grey, size: 8 });
+    textCenter('Prepared By', margin, sigY - 24, sigW, { font: boldFont, size: 8.5, color: black });
 
-    drawRect(margin + sigW + 20, y, sigW, sigH, rgb(0.92, 0.92, 0.92));
-    drawRectBorder(margin + sigW + 20, y + 1, sigW, sigH, rgb(0.6, 0.6, 0.6));
-    text('......................................', margin + sigW + 40, y - 8, { color: grey, size: 8 });
-    textCenter('Authorised By', margin + sigW + 20, y - 24, sigW, { font: boldFont, size: 8.5, color: black });
-
-    y -= sigH + 18;
+    drawRect(margin + sigW + 20, sigY, sigW, sigH, rgb(0.92, 0.92, 0.92));
+    drawRectBorder(margin + sigW + 20, sigY, sigW, sigH, rgb(0.6, 0.6, 0.6));
+    text('......................................', margin + sigW + 40, sigY - 8, { color: grey, size: 8 });
+    textCenter('Authorised By', margin + sigW + 20, sigY - 24, sigW, { font: boldFont, size: 8.5, color: black });
 
     // ═══════════════════════════════════════════════════════════
-    // 9. BACKGROUND WATERMARK
+    // 9. BACKGROUND WATERMARK (CENTERED ON PAGE BACKGROUND)
     // ═══════════════════════════════════════════════════════════
     page.drawText('PRO TECH AUTOMOBILE', {
       x: 60, y: 280,
@@ -372,15 +370,12 @@ window.ProTechPDF = {
     });
 
     // ═══════════════════════════════════════════════════════════
-    // 10. FOOTER THANK YOU MESSAGE
+    // 10. FOOTER THANK YOU MESSAGE (ANCHORED AT VERY BOTTOM OF A4 PAGE)
     // ═══════════════════════════════════════════════════════════
-    drawLine(margin, y, W - margin, y, midBlue, 1.5);
-    y -= 14;
-    textCenter('THANK YOU FOR YOUR CHOISE !!!', margin, y, contentW, { font: boldFont, size: 10, color: midBlue });
-    y -= 12;
-    textCenter('COME AGAIN....', margin, y, contentW, { font: italicFont, size: 9, color: midBlue });
-    y -= 8;
-    drawLine(margin, y, W - margin, y, midBlue, 1.5);
+    drawLine(margin, 80, W - margin, 80, midBlue, 1.5);
+    textCenter('THANK YOU FOR YOUR CHOISE !!!', margin, 62, contentW, { font: boldFont, size: 10, color: midBlue });
+    textCenter('COME AGAIN....', margin, 46, contentW, { font: italicFont, size: 9, color: midBlue });
+    drawLine(margin, 32, W - margin, 32, midBlue, 1.5);
 
     // ─── SAVE AND TRIGGER DOWNLOAD ───────────────────────────
     const pdfBytes = await doc.save();
