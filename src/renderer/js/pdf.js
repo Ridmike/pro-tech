@@ -209,7 +209,7 @@ window.ProTechPDF = {
 
     textCenter('CUSTOMER REQUEST', margin, y, reqLabelW, { font: boldFont, size: 8.5, color: white, rowH: reqH });
     text((jc.problem || 'REPAIR BRAKE FLUID LEAK').toUpperCase(), margin + reqLabelW + 8, y, { font: boldFont, size: 8.5, color: black, rowH: reqH });
-    y -= reqH + 2;
+    y -= reqH + 6;
 
     // ═══════════════════════════════════════════════════════════
     // 5. PRODUCTS / PARTS TABLE
