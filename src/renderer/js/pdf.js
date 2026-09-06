@@ -78,19 +78,25 @@ window.ProTechPDF = {
       });
     };
 
-    const text = (str, x, y, { font = regularFont, size = 9, color = black } = {}) => {
-      page.drawText(String(str || ''), { x, y: y - size, font, size, color });
+    const text = (str, x, y, { font = regularFont, size = 9, color = black, rowH = 0 } = {}) => {
+      // Vertically center text within rowH if provided
+      const vy = rowH > 0 ? y - (rowH - size) / 2 - size : y - size;
+      page.drawText(String(str || ''), { x, y: vy, font, size, color });
     };
 
-    const textCenter = (str, x, y, w, { font = regularFont, size = 9, color = black } = {}) => {
+    const textCenter = (str, x, y, w, { font = regularFont, size = 9, color = black, rowH = 0 } = {}) => {
       const textW = font.widthOfTextAtSize(String(str || ''), size);
       const cx = x + (w - textW) / 2;
-      page.drawText(String(str || ''), { x: cx, y: y - size, font, size, color });
+      // Vertically center text within rowH if provided
+      const vy = rowH > 0 ? y - (rowH - size) / 2 - size : y - size;
+      page.drawText(String(str || ''), { x: cx, y: vy, font, size, color });
     };
 
-    const textRight = (str, x, y, w, { font = regularFont, size = 9, color = black } = {}) => {
+    const textRight = (str, x, y, w, { font = regularFont, size = 9, color = black, rowH = 0 } = {}) => {
       const textW = font.widthOfTextAtSize(String(str || ''), size);
-      page.drawText(String(str || ''), { x: x + w - textW, y: y - size, font, size, color });
+      // Vertically center text within rowH if provided
+      const vy = rowH > 0 ? y - (rowH - size) / 2 - size : y - size;
+      page.drawText(String(str || ''), { x: x + w - textW, y: vy, font, size, color });
     };
 
     const lkr = (amount) => `LKR ${(Number(amount) || 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -173,9 +179,9 @@ window.ProTechPDF = {
     drawRect(margin + colPlate, y, colModel, vehHeaderH, darkBlue);
     drawRect(margin + colPlate + colModel, y, colMile, vehHeaderH, darkBlue);
 
-    textCenter('VEHICLE REGISTRATION NUMBER', margin, y, colPlate, { font: boldFont, size: 8, color: white });
-    textCenter('MODEL', margin + colPlate, y, colModel, { font: boldFont, size: 8, color: white });
-    textCenter('MILEAGE', margin + colPlate + colModel, y, colMile, { font: boldFont, size: 8, color: white });
+    textCenter('VEHICLE REGISTRATION NUMBER', margin, y, colPlate, { font: boldFont, size: 8, color: white, rowH: vehHeaderH });
+    textCenter('MODEL', margin + colPlate, y, colModel, { font: boldFont, size: 8, color: white, rowH: vehHeaderH });
+    textCenter('MILEAGE', margin + colPlate + colModel, y, colMile, { font: boldFont, size: 8, color: white, rowH: vehHeaderH });
     y -= vehHeaderH;
 
     const vehRowH = 18;
@@ -188,9 +194,9 @@ window.ProTechPDF = {
     const makeModelParts = (jc.vehicle_make_model || '').split(' ');
     const modelName = makeModelParts.slice(1).join(' ') || jc.vehicle_make_model || 'AQUA';
 
-    textCenter(jc.vehicle_plate || 'WP KY-5728', margin, y, colPlate, { font: boldFont, size: 9, color: darkBlue });
-    textCenter(modelName, margin + colPlate, y, colModel, { font: boldFont, size: 9, color: black });
-    textCenter(`${jc.mileage_at_intake ? jc.mileage_at_intake.toLocaleString() + ' Km' : '176 705 Km'}`, margin + colPlate + colModel, y, colMile, { font: regularFont, size: 9, color: black });
+    textCenter(jc.vehicle_plate || 'WP KY-5728', margin, y, colPlate, { font: boldFont, size: 9, color: darkBlue, rowH: vehRowH });
+    textCenter(modelName, margin + colPlate, y, colModel, { font: boldFont, size: 9, color: black, rowH: vehRowH });
+    textCenter(`${jc.mileage_at_intake ? jc.mileage_at_intake.toLocaleString() + ' Km' : '176 705 Km'}`, margin + colPlate + colModel, y, colMile, { font: regularFont, size: 9, color: black, rowH: vehRowH });
     y -= vehRowH + 4;
 
     // ═══════════════════════════════════════════════════════════
@@ -201,8 +207,8 @@ window.ProTechPDF = {
     drawRect(margin, y, reqLabelW, reqH, darkBlue);
     drawRect(margin + reqLabelW, y, contentW - reqLabelW, reqH, lightBlue);
 
-    textCenter('CUSTOMER REQUEST', margin, y, reqLabelW, { font: boldFont, size: 8.5, color: white });
-    text((jc.problem || 'REPAIR BRAKE FLUID LEAK').toUpperCase(), margin + reqLabelW + 8, y, { font: boldFont, size: 8.5, color: black });
+    textCenter('CUSTOMER REQUEST', margin, y, reqLabelW, { font: boldFont, size: 8.5, color: white, rowH: reqH });
+    text((jc.problem || 'REPAIR BRAKE FLUID LEAK').toUpperCase(), margin + reqLabelW + 8, y, { font: boldFont, size: 8.5, color: black, rowH: reqH });
     y -= reqH + 2;
 
     // ═══════════════════════════════════════════════════════════
@@ -229,7 +235,7 @@ window.ProTechPDF = {
 
     partsHeaderCols.forEach(col => {
       drawRect(px, y, col.w, pHeaderH, darkBlue);
-      textCenter(col.label, px, y, col.w, { font: boldFont, size: 7.5, color: white });
+      textCenter(col.label, px, y, col.w, { font: boldFont, size: 7.5, color: white, rowH: pHeaderH });
       px += col.w;
     });
     y -= pHeaderH;
@@ -248,12 +254,12 @@ window.ProTechPDF = {
         const lineTotal = (p.sell_price || 0) * (p.qty || 1);
         partsTotal += lineTotal;
         let px2 = margin;
-        textCenter(String(i + 1), px2, y, pColSno, { size: 8.5 }); px2 += pColSno;
-        text(p.part_name || '', px2 + 3, y, { size: 8 }); px2 += pColDesc;
-        textCenter(String(p.qty || 1), px2, y, pColQty, { size: 8.5 }); px2 += pColQty;
-        textRight(num(p.sell_price), px2, y, pColUnit - 4, { size: 8.5 }); px2 += pColUnit;
-        textCenter('-', px2, y, pColDisc, { size: 8.5, color: grey }); px2 += pColDisc;
-        textRight(num(lineTotal), px2, y, pColNet - 4, { size: 8.5, font: boldFont });
+        textCenter(String(i + 1), px2, y, pColSno, { size: 8.5, rowH }); px2 += pColSno;
+        textCenter(p.part_name || '', px2, y, pColDesc, { size: 8, rowH }); px2 += pColDesc;
+        textCenter(String(p.qty || 1), px2, y, pColQty, { size: 8.5, rowH }); px2 += pColQty;
+        textRight(num(p.sell_price), px2, y, pColUnit - 4, { size: 8.5, rowH }); px2 += pColUnit;
+        textCenter('-', px2, y, pColDisc, { size: 8.5, color: grey, rowH }); px2 += pColDisc;
+        textRight(num(lineTotal), px2, y, pColNet - 4, { size: 8.5, font: boldFont, rowH });
       }
       y -= rowH;
     }
@@ -263,8 +269,8 @@ window.ProTechPDF = {
     const subLabelX = margin + pColSno + pColDesc + pColQty + pColUnit + pColDisc;
     drawRect(margin + pColSno + pColDesc + pColQty, y, contentW - pColSno - pColDesc - pColQty, subRowH, lightBlue);
     drawRectBorder(margin + pColSno + pColDesc + pColQty, y + 1, contentW - pColSno - pColDesc - pColQty, subRowH, rgb(0.5, 0.5, 0.5));
-    textRight('SUB AMOUNT', margin, y, subLabelX - margin - 4, { font: boldFont, size: 8.5, color: darkBlue });
-    textRight(num(partsTotal), subLabelX, y, pColNet - 4, { font: boldFont, size: 9, color: darkBlue });
+    textRight('SUB AMOUNT', margin, y, subLabelX - margin - 4, { font: boldFont, size: 8.5, color: darkBlue, rowH: subRowH });
+    textRight(num(partsTotal), subLabelX, y, pColNet - 4, { font: boldFont, size: 9, color: darkBlue, rowH: subRowH });
     y -= subRowH + 2;
 
     // ═══════════════════════════════════════════════════════════
@@ -290,7 +296,7 @@ window.ProTechPDF = {
 
     laborHeaderCols.forEach(col => {
       drawRect(lx, y, col.w, lHeaderH, darkBlue);
-      textCenter(col.label, lx, y, col.w, { font: boldFont, size: 7.5, color: white });
+      textCenter(col.label, lx, y, col.w, { font: boldFont, size: 7.5, color: white, rowH: lHeaderH });
       lx += col.w;
     });
     y -= lHeaderH;
@@ -309,11 +315,11 @@ window.ProTechPDF = {
         const lineTotal = (l.hours || 0) * (l.rate || 0);
         laborTotal += lineTotal;
         let lx2 = margin;
-        textCenter(String(i + 1), lx2, y, lColSno, { size: 8.5 }); lx2 += lColSno;
-        text(l.description || '', lx2 + 3, y, { size: 8 }); lx2 += lColDesc;
-        textCenter(String(l.hours || ''), lx2, y, lColHrs, { size: 8.5 }); lx2 += lColHrs;
-        textRight(num(l.rate), lx2, y, lColRate - 4, { size: 8.5 }); lx2 += lColRate;
-        textRight(num(lineTotal), lx2, y, lColNet - 4, { font: boldFont, size: 8.5 });
+        textCenter(String(i + 1), lx2, y, lColSno, { size: 8.5, rowH }); lx2 += lColSno;
+        textCenter(l.description || '', lx2, y, lColDesc, { size: 8, rowH }); lx2 += lColDesc;
+        textCenter(String(l.hours || ''), lx2, y, lColHrs, { size: 8.5, rowH }); lx2 += lColHrs;
+        textRight(num(l.rate), lx2, y, lColRate - 4, { size: 8.5, rowH }); lx2 += lColRate;
+        textRight(num(lineTotal), lx2, y, lColNet - 4, { font: boldFont, size: 8.5, rowH });
       }
       y -= rowH;
     }
@@ -331,12 +337,14 @@ window.ProTechPDF = {
       drawRectBorder(totalLabelX, y + 1, totalW, rowH, rgb(0.5, 0.5, 0.5));
       const valW = totalW * 0.42;
       const lblW = totalW - valW;
-      textCenter(label, totalLabelX, y, lblW, { font: boldFont, size: isLast ? 8.5 : 8, color: textColor });
-      textRight(value, totalLabelX + lblW, y, valW - 4, { font: boldFont, size: isLast ? 9.5 : 8.5, color: textColor });
+      // Both label and value are vertically centered within rowH
+      textCenter(label, totalLabelX, y, lblW, { font: boldFont, size: isLast ? 8.5 : 8, color: textColor, rowH });
+      textRight(value, totalLabelX + lblW, y, valW - 4, { font: boldFont, size: isLast ? 9.5 : 8.5, color: textColor, rowH });
       y -= rowH;
     };
 
     drawTotalRow('SUB AMOUNT', num(laborTotal), lightBlue, darkBlue);
+    y -= 6; // Gap between SUB AMOUNT and INVOICE TOTAL AMOUNT
     drawTotalRow('INVOICE TOTAL AMOUNT', num(grandTotal), darkBlue, white);
     drawTotalRow('ADVANCE PAYMENT', '-', rowAlt, black);
     drawTotalRow('NET AMOUNT TO PAY', lkr(grandTotal), darkBlue, golden, true);
