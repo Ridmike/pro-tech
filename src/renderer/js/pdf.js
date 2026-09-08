@@ -271,7 +271,7 @@ window.ProTechPDF = {
     drawRectBorder(margin + pColSno + pColDesc + pColQty, y + 1, contentW - pColSno - pColDesc - pColQty, subRowH, rgb(0.5, 0.5, 0.5));
     textRight('SUB AMOUNT', margin, y, subLabelX - margin - 4, { font: boldFont, size: 8.5, color: darkBlue, rowH: subRowH });
     textRight(num(partsTotal), subLabelX, y, pColNet - 4, { font: boldFont, size: 9, color: darkBlue, rowH: subRowH });
-    y -= subRowH + 2;
+    y -= subRowH + 8; // Gap after products sub-amount (matches labor table gap)
 
     // ═══════════════════════════════════════════════════════════
     // 6. SERVICES / LABOR TABLE
