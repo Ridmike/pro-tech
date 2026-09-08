@@ -206,6 +206,28 @@ window.GarageFlowJobCards = {
         }
       });
     });
+
+    // Download Invoice PDF Button
+    const printBtn = document.getElementById('btn-print-jc-invoice');
+    if (printBtn) {
+      printBtn.addEventListener('click', async () => {
+        if (!this.currentSelectedJobId) return;
+        const jc = this.activeJobCards.find(j => j.id === this.currentSelectedJobId);
+        if (!jc) return;
+        if (window.ProTechPDF) {
+          printBtn.textContent = 'Generating...';
+          printBtn.disabled = true;
+          try {
+            await window.ProTechPDF.generateInvoice(jc);
+          } finally {
+            printBtn.textContent = '⬇ Download Invoice PDF';
+            printBtn.disabled = false;
+          }
+        } else {
+          alert('PDF generator not loaded yet. Please wait a moment.');
+        }
+      });
+    }
   },
 
   createJobCard: async function() {
@@ -408,6 +430,7 @@ window.GarageFlowJobCards = {
   saveDiagnosis: async function() {
     if (!this.currentSelectedJobId) return;
     const diagText = document.getElementById('detail-jc-diagnosis').value.trim();
+    const diagTextarea = document.getElementById('detail-jc-diagnosis');
 
     try {
       if (window.GarageFlowFirebase && window.GarageFlowFirebase.db) {
@@ -415,10 +438,47 @@ window.GarageFlowJobCards = {
           diagnosis: diagText
         });
       }
-      alert('Diagnosis notes saved successfully!');
+      // Use a non-blocking toast instead of alert() to avoid focus lock
+      this._showToast('Diagnosis notes saved successfully!', 'success');
+      // Return focus to the textarea so user can keep typing
+      if (diagTextarea) diagTextarea.focus();
     } catch (err) {
-      alert('Failed to save diagnosis: ' + err.message);
+      this._showToast('Failed to save diagnosis: ' + err.message, 'error');
     }
+  },
+
+  // Non-blocking toast notification helper
+  _showToast: function(message, type = 'success') {
+    const existing = document.getElementById('protech-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'protech-toast';
+    toast.textContent = message;
+    toast.style.cssText = [
+      'position: fixed',
+      'bottom: 2rem',
+      'right: 2rem',
+      'z-index: 9999',
+      'padding: 0.85rem 1.5rem',
+      'border-radius: 10px',
+      'font-family: var(--font-main)',
+      'font-size: 0.9rem',
+      'font-weight: 600',
+      'color: #fff',
+      'box-shadow: 0 8px 24px rgba(0,0,0,0.4)',
+      'pointer-events: none',
+      'transition: opacity 0.4s ease',
+      type === 'success'
+        ? 'background: linear-gradient(135deg, #10b981, #059669)'
+        : 'background: linear-gradient(135deg, #ef4444, #dc2626)'
+    ].join(';');
+
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 400);
+    }, 2500);
   },
 
   submitAddPart: async function() {

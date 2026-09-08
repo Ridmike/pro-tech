@@ -250,6 +250,12 @@
   pointer-events: auto;
 }
 
+/* Child modals (Add Part, Add Labor) must stack above the parent Job Card Detail modal */
+#modal-add-part,
+#modal-add-labor {
+  z-index: 200;
+}
+
 .modal-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
