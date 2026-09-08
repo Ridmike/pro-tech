@@ -43,7 +43,7 @@ window.ProTechPDF = {
     const { PDFDocument, rgb, StandardFonts } = PDFLib;
 
     const doc = await PDFDocument.create();
-    const page = doc.addPage([595, 842]); // A4 Page
+    let page = doc.addPage([595, 842]); // A4 Page – reassigned for multi-page support
 
     const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
     const regularFont = await doc.embedFont(StandardFonts.Helvetica);
@@ -107,6 +107,38 @@ window.ProTechPDF = {
     };
 
     let y = 842;
+
+    // ─── MULTI-PAGE SUPPORT ──────────────────────────────────────
+    // Footer + signatures occupy y=32–140 on every page.
+    // Trigger a new page when content gets within 15pt of the signature box.
+    const BOTTOM_MARGIN = 55;
+    const PAGE_CONTENT_TOP = 820; // where new-page content starts
+
+    const startNewPage = () => {
+      // Watermark on the page we're leaving
+      page.drawText('PRO TECH AUTOMOBILE', {
+        x: 60, y: 280, font: boldFont, size: 40,
+        color: rgb(0.85, 0.88, 0.94), opacity: 0.15,
+        rotate: { type: 'degrees', angle: 25 }
+      });
+      // Create fresh page – ALL helpers reference `page` by closure so
+      // this single reassignment is enough to redirect every draw call.
+      page = doc.addPage([595, 842]);
+      y = PAGE_CONTENT_TOP;
+      // Thin accent bar at top of continuation page
+      page.drawRectangle({ x: 0, y: y - 4, width: W, height: 4, color: midBlue });
+      y -= 4 + 8;
+    };
+
+    // Callback invoked after every page break to re-draw the active table header
+    let onNewPage = null;
+
+    const checkPage = (neededH = 20) => {
+      if (y - neededH < BOTTOM_MARGIN) {
+        startNewPage();
+        if (onNewPage) onNewPage(); // Re-draw table header on the new page
+      }
+    };
 
     // ═══════════════════════════════════════════════════════════
     // 1. TOP LETTERHEAD HEADER (letterhead.jpeg)
@@ -233,19 +265,28 @@ window.ProTechPDF = {
       { w: pColNet, label: 'NET AMOUNT' }
     ];
 
-    partsHeaderCols.forEach(col => {
-      drawRect(px, y, col.w, pHeaderH, darkBlue);
-      textCenter(col.label, px, y, col.w, { font: boldFont, size: 7.5, color: white, rowH: pHeaderH });
-      px += col.w;
-    });
-    y -= pHeaderH;
+    // Reusable parts header draw function (called on first render + after page breaks)
+    const drawPartsHeader = () => {
+      let px = margin;
+      partsHeaderCols.forEach(col => {
+        drawRect(px, y, col.w, pHeaderH, darkBlue);
+        textCenter(col.label, px, y, col.w, { font: boldFont, size: 7.5, color: white, rowH: pHeaderH });
+        px += col.w;
+      });
+      y -= pHeaderH;
+    };
+
+    checkPage(pHeaderH + 16 * 2);
+    drawPartsHeader();
 
     // Parts Data Rows
     let partsTotal = 0;
     const minPartRows = Math.max((parts.length || 0), 4);
+    onNewPage = drawPartsHeader; // Re-draw parts header on page break
     for (let i = 0; i < minPartRows; i++) {
       const p = parts[i];
       const rowH = 16;
+      checkPage(rowH); // Add new page if this row would overflow
       const bg = i % 2 === 0 ? white : rowAlt;
       drawRect(margin, y, contentW, rowH, bg);
       drawRectBorder(margin, y + 1, contentW, rowH, rgb(0.75, 0.75, 0.75));
@@ -264,7 +305,10 @@ window.ProTechPDF = {
       y -= rowH;
     }
 
+    onNewPage = null; // Done with parts table
+
     // Sub amount row for parts
+    checkPage(16 + 20); // Ensure sub-amount row has space
     const subRowH = 16;
     const subLabelX = margin + pColSno + pColDesc + pColQty + pColUnit + pColDisc;
     drawRect(margin + pColSno + pColDesc + pColQty, y, contentW - pColSno - pColDesc - pColQty, subRowH, lightBlue);
@@ -294,19 +338,28 @@ window.ProTechPDF = {
       { w: lColNet, label: 'NET AMOUNT' }
     ];
 
-    laborHeaderCols.forEach(col => {
-      drawRect(lx, y, col.w, lHeaderH, darkBlue);
-      textCenter(col.label, lx, y, col.w, { font: boldFont, size: 7.5, color: white, rowH: lHeaderH });
-      lx += col.w;
-    });
-    y -= lHeaderH;
+    // Reusable labor header draw function (called on first render + after page breaks)
+    const drawLaborHeader = () => {
+      let lx = margin;
+      laborHeaderCols.forEach(col => {
+        drawRect(lx, y, col.w, lHeaderH, darkBlue);
+        textCenter(col.label, lx, y, col.w, { font: boldFont, size: 7.5, color: white, rowH: lHeaderH });
+        lx += col.w;
+      });
+      y -= lHeaderH;
+    };
+
+    checkPage(lHeaderH + 16 * 2);
+    drawLaborHeader();
 
     // Labor Data Rows
     let laborTotal = 0;
     const minLaborRows = Math.max((labor.length || 0), 4);
+    onNewPage = drawLaborHeader; // Re-draw labor header on page break
     for (let i = 0; i < minLaborRows; i++) {
       const l = labor[i];
       const rowH = 16;
+      checkPage(rowH); // Add new page if this row would overflow
       const bg = i % 2 === 0 ? white : rowAlt;
       drawRect(margin, y, contentW, rowH, bg);
       drawRectBorder(margin, y + 1, contentW, rowH, rgb(0.75, 0.75, 0.75));
@@ -323,6 +376,11 @@ window.ProTechPDF = {
       }
       y -= rowH;
     }
+
+    onNewPage = null; // Done with labor table
+
+    // Sub amount row for labor
+    checkPage(16 + 20); // Ensure labor sub-amount row has space
 
     // ═══════════════════════════════════════════════════════════
     // 7. TOTALS SUMMARY BLOCK
@@ -343,6 +401,8 @@ window.ProTechPDF = {
       y -= rowH;
     };
 
+    // Totals block = 4 rows × 17pt + 6pt gap = 74pt. Ensure it all fits before drawing.
+    checkPage(74);
     drawTotalRow('SUB AMOUNT', num(laborTotal), lightBlue, darkBlue);
     y -= 6; // Gap between SUB AMOUNT and INVOICE TOTAL AMOUNT
     drawTotalRow('INVOICE TOTAL AMOUNT', num(grandTotal), darkBlue, white);
@@ -367,7 +427,7 @@ window.ProTechPDF = {
     textCenter('Authorised By', margin + sigW + 20, sigY - 24, sigW, { font: boldFont, size: 8.5, color: black });
 
     // ═══════════════════════════════════════════════════════════
-    // 9. BACKGROUND WATERMARK (CENTERED ON PAGE BACKGROUND)
+    // 9. BACKGROUND WATERMARK (on the last / current page)
     // ═══════════════════════════════════════════════════════════
     page.drawText('PRO TECH AUTOMOBILE', {
       x: 60, y: 280,
