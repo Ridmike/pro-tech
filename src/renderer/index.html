@@ -400,6 +400,30 @@
           placeholder="Record actual root cause analysis and diagnosis..."></textarea>
       </div>
 
+      <!-- Special Notes Section (Invoice Page 2) -->
+      <div style="margin-top: 1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+          <h3 style="font-size:1rem; font-family:var(--font-heading);">Special Notes <span style="font-size:0.75rem; color:var(--text-muted); font-weight:400;">(Printed on Invoice Page 2)</span></h3>
+          <button class="btn btn-secondary btn-sm" id="btn-open-add-special-note">+ Add Note</button>
+        </div>
+        <div class="table-container">
+          <table class="data-table" style="font-size:0.825rem;">
+            <thead>
+              <tr>
+                <th style="width:50px;">S.NO.</th>
+                <th>Note</th>
+                <th style="width:60px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="detail-jc-special-notes-list">
+              <tr>
+                <td colspan="3" style="text-align:center; color:var(--text-dim);">No special notes added yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Parts Section -->
       <div style="margin-top: 1.5rem;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
@@ -545,6 +569,28 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-labor')">Cancel</button>
           <button type="submit" class="btn btn-primary">Add Labor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- MODAL 5: ADD SPECIAL NOTE -->
+  <div class="modal-overlay" id="modal-add-special-note">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Add Special Note</h3>
+        <button class="modal-close" onclick="closeModal('modal-add-special-note')">&times;</button>
+      </div>
+      <form id="form-add-special-note">
+        <div class="form-group" style="margin-top:1rem;">
+          <label class="form-label">Note *</label>
+          <textarea class="form-textarea" id="special-note-text" rows="3"
+            placeholder="e.g. NEED TO REPLACE RADIATOR FAN MOTOR (PLAY)" required></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-special-note')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Note</button>
         </div>
       </form>
     </div>

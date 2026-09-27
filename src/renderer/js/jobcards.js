@@ -196,6 +196,22 @@ window.GarageFlowJobCards = {
       });
     }
 
+    // Add Special Note Button + Form
+    const openAddNoteBtn = document.getElementById('btn-open-add-special-note');
+    if (openAddNoteBtn) {
+      openAddNoteBtn.addEventListener('click', () => {
+        window.openModal('modal-add-special-note');
+      });
+    }
+
+    const noteForm = document.getElementById('form-add-special-note');
+    if (noteForm) {
+      noteForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await this.submitAddSpecialNote();
+      });
+    }
+
     // Stepper buttons
     const stepperBtns = document.querySelectorAll('#jc-status-stepper .step-btn');
     stepperBtns.forEach(btn => {
@@ -344,8 +360,9 @@ window.GarageFlowJobCards = {
       }
     });
 
-    // Render Parts and Labor Line Items & Calculate Totals
+    // Render Parts, Labor, and Special Notes Line Items & Calculate Totals
     this.renderLineItems(jc);
+    this.renderSpecialNotes(jc);
 
     window.openModal('modal-jobcard-detail');
   },
@@ -571,6 +588,73 @@ window.GarageFlowJobCards = {
       this.openDetailModal(this.currentSelectedJobId);
     } catch (err) {
       alert('Failed to delete labor: ' + err.message);
+    }
+  },
+
+  // ── SPECIAL NOTES ─────────────────────────────────────────
+  renderSpecialNotes: function(jc) {
+    const tbody = document.getElementById('detail-jc-special-notes-list');
+    if (!tbody) return;
+    const notes = jc.special_notes || [];
+    if (notes.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--text-dim);">No special notes added yet.</td></tr>`;
+    } else {
+      tbody.innerHTML = notes.map((note, idx) => `
+        <tr>
+          <td style="text-align:center;">${idx + 1}</td>
+          <td>${note}</td>
+          <td><button class="btn btn-danger btn-sm" onclick="window.GarageFlowJobCards.deleteSpecialNote(${idx})">&times;</button></td>
+        </tr>
+      `).join('');
+    }
+  },
+
+  submitAddSpecialNote: async function() {
+    if (!this.currentSelectedJobId) return;
+    const jc = this.activeJobCards.find(j => j.id === this.currentSelectedJobId);
+    if (!jc) return;
+
+    const noteText = document.getElementById('special-note-text').value.trim();
+    if (!noteText) return;
+
+    const currentNotes = jc.special_notes || [];
+    currentNotes.push(noteText.toUpperCase());
+
+    try {
+      if (window.GarageFlowFirebase && window.GarageFlowFirebase.db) {
+        await window.GarageFlowFirebase.db.collection('job_cards').doc(this.currentSelectedJobId).update({
+          special_notes: currentNotes
+        });
+      } else {
+        jc.special_notes = currentNotes;
+      }
+      window.closeModal('modal-add-special-note');
+      document.getElementById('form-add-special-note').reset();
+      this.openDetailModal(this.currentSelectedJobId);
+    } catch (err) {
+      alert('Failed to add special note: ' + err.message);
+    }
+  },
+
+  deleteSpecialNote: async function(index) {
+    if (!this.currentSelectedJobId) return;
+    const jc = this.activeJobCards.find(j => j.id === this.currentSelectedJobId);
+    if (!jc) return;
+
+    const currentNotes = jc.special_notes || [];
+    currentNotes.splice(index, 1);
+
+    try {
+      if (window.GarageFlowFirebase && window.GarageFlowFirebase.db) {
+        await window.GarageFlowFirebase.db.collection('job_cards').doc(this.currentSelectedJobId).update({
+          special_notes: currentNotes
+        });
+      } else {
+        jc.special_notes = currentNotes;
+      }
+      this.openDetailModal(this.currentSelectedJobId);
+    } catch (err) {
+      alert('Failed to delete special note: ' + err.message);
     }
   },
 

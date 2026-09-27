@@ -40,6 +40,8 @@ window.ProTechPDF = {
       return;
     }
 
+    try {
+
     const { PDFDocument, rgb, StandardFonts } = PDFLib;
 
     const doc = await PDFDocument.create();
@@ -307,15 +309,18 @@ window.ProTechPDF = {
 
     onNewPage = null; // Done with parts table
 
-    // Sub amount row for parts
-    checkPage(16 + 20); // Ensure sub-amount row has space
-    const subRowH = 16;
-    const subLabelX = margin + pColSno + pColDesc + pColQty + pColUnit + pColDisc;
-    drawRect(margin + pColSno + pColDesc + pColQty, y, contentW - pColSno - pColDesc - pColQty, subRowH, lightBlue);
-    drawRectBorder(margin + pColSno + pColDesc + pColQty, y + 1, contentW - pColSno - pColDesc - pColQty, subRowH, rgb(0.5, 0.5, 0.5));
-    textRight('SUB AMOUNT', margin, y, subLabelX - margin - 4, { font: boldFont, size: 8.5, color: darkBlue, rowH: subRowH });
-    textRight(num(partsTotal), subLabelX, y, pColNet - 4, { font: boldFont, size: 9, color: darkBlue, rowH: subRowH });
-    y -= subRowH + 8; // Gap after products sub-amount (matches labor table gap)
+    // Sub amount row for parts (matches labor sub amount box width and layout)
+    checkPage(17 + 20);
+    const pSubH = 17;
+    const pSubW = contentW * 0.50;
+    const pSubX = margin + contentW * 0.50;
+    const pValW = pSubW * 0.42;
+    const pLblW = pSubW - pValW;
+    drawRect(pSubX, y, pSubW, pSubH, lightBlue);
+    drawRectBorder(pSubX, y + 1, pSubW, pSubH, rgb(0.5, 0.5, 0.5));
+    textCenter('SUB AMOUNT', pSubX, y, pLblW, { font: boldFont, size: 8, color: darkBlue, rowH: pSubH });
+    textRight(num(partsTotal), pSubX + pLblW, y, pValW - 4, { font: boldFont, size: 8.5, color: darkBlue, rowH: pSubH });
+    y -= pSubH + 8; // Gap after products sub-amount (matches labor table gap)
 
     // ═══════════════════════════════════════════════════════════
     // 6. SERVICES / LABOR TABLE
@@ -445,19 +450,161 @@ window.ProTechPDF = {
     textCenter('COME AGAIN....', margin, 46, contentW, { font: italicFont, size: 9, color: midBlue });
     drawLine(margin, 32, W - margin, 32, midBlue, 1.5);
 
-    // ─── SAVE AND TRIGGER DOWNLOAD ───────────────────────────
-    const pdfBytes = await doc.save();
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
+    // ═══════════════════════════════════════════════════════════
+    // PAGE 2 – SPECIAL NOTES & SERVICE CHECKLIST (always included)
+    // ═══════════════════════════════════════════════════════════
+    page = doc.addPage([595, 842]);
+    y = 820;
 
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `ProTech_Invoice_${jc.job_card_id || jc.id}_${jc.vehicle_plate}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    // Watermark on page 2
+    page.drawText('PRO TECH AUTOMOBILE', {
+      x: 60, y: 280, font: boldFont, size: 40,
+      color: rgb(0.85, 0.88, 0.94), opacity: 0.15,
+      rotate: { type: 'degrees', angle: 25 }
+    });
 
-    console.log(`[PDF] Downloaded ProTech letterhead PDF: ProTech_Invoice_${jc.job_card_id}.pdf`);
+    // ── Text-wrap helper ─────────────────────────────────────
+    const wrapText = (str, maxW, fnt, sz) => {
+      const words = String(str || '').split(' ');
+      const lines = [];
+      let cur = '';
+      for (const w of words) {
+        const test = cur ? cur + ' ' + w : w;
+        if (fnt.widthOfTextAtSize(test, sz) > maxW) {
+          if (cur) lines.push(cur);
+          cur = w;
+        } else { cur = test; }
+      }
+      if (cur) lines.push(cur);
+      return lines;
+    };
+
+    // ── 2A. SPECIAL NOTES TABLE ──────────────────────────────
+    const snColSno   = 35;
+    const snColNotes = contentW - snColSno;
+    const snHeaderH  = 20;
+
+    drawRect(margin, y, snColSno, snHeaderH, darkBlue);
+    drawRect(margin + snColSno, y, snColNotes, snHeaderH, darkBlue);
+    textCenter('S.NO.', margin, y, snColSno, { font: boldFont, size: 8, color: white, rowH: snHeaderH });
+    textCenter('SPECIAL NOTES', margin + snColSno, y, snColNotes, { font: boldFont, size: 9, color: white, rowH: snHeaderH });
+    y -= snHeaderH;
+
+    // Parse special_notes array (added via the Special Notes table in job card modal)
+    const rawDiag = Array.isArray(jc.special_notes) ? jc.special_notes.filter(Boolean) : [];
+    const minNoteRows = Math.max(rawDiag.length, 8);
+    for (let i = 0; i < minNoteRows; i++) {
+      const note = rawDiag[i] || '';
+      const noteRowH = 18;
+      const bg2 = i % 2 === 0 ? white : rowAlt;
+      drawRect(margin, y, snColSno, noteRowH, bg2);
+      drawRect(margin + snColSno, y, snColNotes, noteRowH, bg2);
+      drawRectBorder(margin, y + 1, contentW, noteRowH, rgb(0.75, 0.75, 0.75));
+      const numColor = note ? black : rgb(0.78, 0.78, 0.78);
+      textCenter(String(i + 1), margin, y, snColSno, { size: 8, rowH: noteRowH, color: numColor });
+      if (note) {
+        text(note, margin + snColSno + 6, y, { size: 8, rowH: noteRowH });
+      }
+      y -= noteRowH;
+    }
+
+    y -= 12;
+
+    // ── 2B. REMEMBER BLOCK ───────────────────────────────────
+    const remH = 22;
+    drawRect(margin, y, contentW, remH, rgb(0.82, 0.10, 0.10));
+    textCenter('REMEMBER', margin, y, contentW, { font: boldFont, size: 11, color: white, rowH: remH });
+    y -= remH + 6;
+
+    const warnStr = 'AFTER INSTALING THE SPARE PARTS BROUGHT BY THE CUSTOMER, IN THE EVENT OF ANY DEFECT ( DUE TO A DEFECT IN THOSESPARE PARTS ), A FEE WILL BE CHARGED FOR THE DISASSEMBLE AND REASSEMBLE.';
+    const warnLines = wrapText(warnStr, contentW - 16, italicFont, 8.5);
+    for (const wl of warnLines) {
+      text(wl, margin + 8, y, { font: italicFont, size: 8.5, color: rgb(0.78, 0.08, 0.08) });
+      y -= 16; // Line height for warning text
+    }
+
+    y -= 18; // Gap between warning text and SERVICE FUNCTIONS header
+
+    // ── 2C. SERVICE FUNCTIONS HEADER ─────────────────────────
+    const sfH = 18;
+    drawRect(margin, y, contentW, sfH, darkBlue);
+    textCenter('SERVICE FUNCTIONS', margin, y, contentW, { font: boldFont, size: 9, color: white, rowH: sfH });
+    y -= sfH + 8; // Gap below SERVICE FUNCTIONS header before first section title
+
+    // ── Helper: draw a grey bullet section title ─────────────
+    const drawSectionTitle = (label) => {
+      const sh = 17;
+      drawRect(margin, y, contentW, sh, rgb(0.88, 0.88, 0.88));
+      text(label, margin + 5, y, { font: boldFont, size: 7.5, color: black, rowH: sh });
+      y -= sh + 8; // Gap below section title before list items
+    };
+
+    // ── Helper: draw numbered list items ────────────────────
+    const drawListItems = (items) => {
+      items.forEach((item, idx) => {
+        const isSpecial = idx === items.length - 1 && item.startsWith('CHEMICALS');
+        const prefix = isSpecial ? '-' : `${idx + 1}`;
+        const fnt = isSpecial ? italicFont : regularFont;
+        text(`${prefix}    ${item}`, margin + 10, y, { font: fnt, size: 7.5, color: black });
+        y -= 15; // Line height for each list item
+      });
+      y -= 12; // Gap after last item before next section title
+    };
+
+    // ── 2D. LUBE SERVICE LIST ────────────────────────────────
+    drawSectionTitle('>> NORMAL LUBE SERVICE WITH GENUINE ENGINE OIL AND GENUINE OIL FILTER :-');
+    drawListItems([
+      'REPLACE GENUINE ENGINE OIL WITH DRAIN GASKET',
+      'REPLACE EGENUINE ENGINE OIL FILTER',
+      'CLEANE / REPLACE AIR FILTER',
+      'CHECK FRONT AND REAR BRAKES AND ROTATE WHEELS',
+      'CHECK / TOPUP RADIATOR COOLANT AND INVETER/INTERCOOLER COOLANT',
+      'CHECK / TOPUP ATF FLUID',
+      'CHECK / TOPUP BRAKE FLUID',
+      'CHECK / TOPUP AUXILARY BATTERY DISTIL WATER LEVEL',
+      'CHECK FRONT AND REAR SUSPENSSION SYSTEM',
+      'CHECK DRIVE BELT, WIPER BLADES, BULBS, MIRROR AND SHUTTER CONDITION',
+      'CLEAN / REPLACE AC FILTER',
+      'CLEAN HV BATTERY BLOWER'
+    ]);
+
+    // ── 2E. TUNE-UP LIST ─────────────────────────────────────
+    drawSectionTitle('>> TUNE - UP ENGINE WITH USING "O" RING , GLOWMAT AND CHEMICALS :-');
+    drawListItems([
+      'REMOVE , CLEAN , CHECK AND REFIT FUEL INJECTORS USING O RINGS AND GLOWMATS',
+      'REMOVE , CLEAN  AND REFIT SPARK PLUGS AND TUNE-UP ENGINE',
+      'REMOVE , CLEAN AND REFIT EGR VALVE AND EGR COOLER',
+      'REMOVE , CLEAN AND REFIT INLET MANIFOLD ASSY',
+      'REMOVE , CLEAN AND REFIT TROTLE BODY',
+      'CHECK , RESET AND INITIALIZE EFI SYSTEM',
+      'CHEMICALS :- INJECTOR / TROTLE BODY CLEANER, ENGINE CONDITIONER, BRAKE PARTS CLEANER....'
+    ]);
+
+    // ── 2F. PAGE 2 FOOTER ────────────────────────────────────
+    drawLine(margin, 80, W - margin, 80, midBlue, 1.5);
+    textCenter('THANK YOU FOR YOUR CHOISE !!!', margin, 62, contentW, { font: boldFont, size: 10, color: midBlue });
+    textCenter('COME AGAIN....', margin, 46, contentW, { font: italicFont, size: 9, color: midBlue });
+    drawLine(margin, 32, W - margin, 32, midBlue, 1.5);
+
+      // ─── SAVE AND TRIGGER DOWNLOAD ───────────────────────────
+      const pdfBytes = await doc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+
+      const filename = `ProTech_Invoice_${jc.job_card_id || jc.id}_${jc.vehicle_plate}.pdf`;
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+      console.log(`[PDF] Downloaded: ${filename}`);
+
+    } catch (err) {
+      console.error('[PDF] Generation error:', err);
+      alert('PDF generation failed: ' + err.message);
+    }
   }
 };
