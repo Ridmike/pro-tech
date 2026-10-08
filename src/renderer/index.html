@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ProTech AutoMobile — Vehicle Service & Workshop Management</title>
+  <title>ProTech AutoMobile &mdash; Vehicle Service & Workshop Management</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/modules.css">
 </head>
@@ -24,27 +24,31 @@
 
       <nav class="nav-menu">
         <a class="nav-item active" data-view="dashboard">
-          <span class="nav-icon">📊</span>
+          <span class="nav-icon">&#128202;</span>
           <span>Dashboard</span>
         </a>
         <a class="nav-item" data-view="jobcards">
-          <span class="nav-icon">📋</span>
+          <span class="nav-icon">&#128203;</span>
           <span>Job Cards</span>
         </a>
         <a class="nav-item" data-view="vehicles">
-          <span class="nav-icon">🚗</span>
+          <span class="nav-icon">&#128663;</span>
           <span>Vehicles & Clients</span>
         </a>
         <a class="nav-item" data-view="billing">
-          <span class="nav-icon">💳</span>
+          <span class="nav-icon">&#128179;</span>
           <span>Billing & Invoices</span>
         </a>
+        <a class="nav-item" data-view="vehiclehistory">
+          <span class="nav-icon">&#128295;</span>
+          <span>Vehicle History</span>
+        </a>
         <a class="nav-item" data-view="reports">
-          <span class="nav-icon">📈</span>
+          <span class="nav-icon">&#128200;</span>
           <span>Reports & Profit</span>
         </a>
         <a class="nav-item" data-view="settings">
-          <span class="nav-icon">⚙️</span>
+          <span class="nav-icon">&#9881;</span>
           <span>Settings</span>
         </a>
       </nav>
@@ -65,7 +69,7 @@
       <!-- Top Header -->
       <header class="top-header">
         <div class="header-search">
-          <span>🔍</span>
+          <span>&#128269;</span>
           <input type="text" id="global-plate-search" placeholder="Search by Vehicle Plate (e.g. TX-782-LM)...">
         </div>
 
@@ -92,7 +96,7 @@
             <div class="stat-card">
               <div class="stat-header">Active Job Cards</div>
               <div class="stat-value" id="stat-active-jobs">0</div>
-              <div class="stat-footer" id="stat-active-breakdown">0 Diagnosing • 0 In Repair</div>
+              <div class="stat-footer" id="stat-active-breakdown">0 Diagnosing â€¢ 0 In Repair</div>
             </div>
             <div class="stat-card">
               <div class="stat-header">Today's Revenue</div>
@@ -197,7 +201,53 @@
           </div>
         </section>
 
-        <!-- BILLING & INVOICES VIEW -->
+        <!-- VEHICLE HISTORY VIEW -->
+        <section id="view-vehiclehistory" class="view-section">
+          <div class="view-header">
+            <div>
+              <h1 class="view-title">Vehicle Service History</h1>
+              <p class="view-subtitle">Complete repair timeline per vehicle &mdash; mileage, parts &amp; labor by date</p>
+            </div>
+            <div class="vh-search-wrap">
+              <span>&#128269;</span>
+              <input type="text" id="vh-plate-filter" placeholder="Filter by plate..." class="vh-search-input">
+            </div>
+          </div>
+
+          <div class="vh-layout">
+            <!-- LEFT: Vehicle List -->
+            <div class="vh-vehicle-list-panel">
+              <div class="vh-panel-header">All Vehicles</div>
+              <div id="vh-vehicle-list">
+                <div class="vh-empty">No vehicles yet. Create a Job Card first.</div>
+              </div>
+            </div>
+
+            <!-- RIGHT: Service Timeline -->
+            <div class="vh-history-panel">
+              <div id="vh-history-placeholder" class="vh-history-placeholder">
+                <div class="vh-placeholder-icon">ðŸš—</div>
+                <div class="vh-placeholder-text">Select a vehicle to view its full service history</div>
+              </div>
+              <div id="vh-history-content" style="display:none;">
+                <div class="vh-vehicle-header">
+                  <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+                    <span class="plate-badge" id="vh-selected-plate">PLATE</span>
+                    <span class="vh-vehicle-name" id="vh-selected-name">Vehicle Name</span>
+                  </div>
+                  <div class="vh-summary-badges">
+                    <span class="vh-badge vh-badge-blue" id="vh-total-visits">0 Visits</span>
+                    <span class="vh-badge vh-badge-green" id="vh-total-spend">LKR 0.00</span>
+                    <span class="vh-badge vh-badge-purple" id="vh-last-mileage">0 km</span>
+                  </div>
+                </div>
+                <div id="vh-timeline"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- BILLING &amp; INVOICES VIEW -->
         <section id="view-billing" class="view-section">
           <div class="view-header">
             <div>
@@ -375,11 +425,11 @@
       <div class="form-grid-2" style="margin-bottom: 1rem;">
         <div>
           <p style="font-size:0.8rem; color:var(--text-muted);">Vehicle & Owner</p>
-          <p style="font-weight:600;" id="detail-jc-info">BMW 320i • Jonathan Reed (+94 77 123 4567)</p>
+          <p style="font-weight:600;" id="detail-jc-info">BMW 320i â€¢ Jonathan Reed (+94 77 123 4567)</p>
         </div>
         <div>
           <p style="font-size:0.8rem; color:var(--text-muted);">Intake Mileage & Technician</p>
-          <p style="font-weight:600;" id="detail-jc-meta">42,500 km • Dave Mercer</p>
+          <p style="font-weight:600;" id="detail-jc-meta">42,500 km â€¢ Dave Mercer</p>
         </div>
       </div>
 
@@ -398,6 +448,30 @@
         </div>
         <textarea class="form-textarea" id="detail-jc-diagnosis" rows="2"
           placeholder="Record actual root cause analysis and diagnosis..."></textarea>
+      </div>
+
+      <!-- Special Notes Section (Invoice Page 2) -->
+      <div style="margin-top: 1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+          <h3 style="font-size:1rem; font-family:var(--font-heading);">Special Notes <span style="font-size:0.75rem; color:var(--text-muted); font-weight:400;">(Printed on Invoice Page 2)</span></h3>
+          <button class="btn btn-secondary btn-sm" id="btn-open-add-special-note">+ Add Note</button>
+        </div>
+        <div class="table-container">
+          <table class="data-table" style="font-size:0.825rem;">
+            <thead>
+              <tr>
+                <th style="width:50px;">S.NO.</th>
+                <th>Note</th>
+                <th style="width:60px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="detail-jc-special-notes-list">
+              <tr>
+                <td colspan="3" style="text-align:center; color:var(--text-dim);">No special notes added yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Parts Section -->
@@ -480,7 +554,7 @@
         <button type="button" class="btn btn-danger btn-sm" id="btn-delete-jobcard" style="margin-right:auto;">Delete
           Job Card</button>
         <button type="button" class="btn btn-secondary" onclick="closeModal('modal-jobcard-detail')">Close</button>
-        <button type="button" class="btn btn-primary" id="btn-print-jc-invoice">Print Invoice PDF</button>
+        <button type="button" class="btn btn-primary" id="btn-print-jc-invoice">â¬‡ Download Invoice PDF</button>
       </div>
     </div>
   </div>
@@ -550,6 +624,31 @@
     </div>
   </div>
 
+
+  <!-- MODAL 5: ADD SPECIAL NOTE -->
+  <div class="modal-overlay" id="modal-add-special-note">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Add Special Note</h3>
+        <button class="modal-close" onclick="closeModal('modal-add-special-note')">&times;</button>
+      </div>
+      <form id="form-add-special-note">
+        <div class="form-group" style="margin-top:1rem;">
+          <label class="form-label">Note *</label>
+          <textarea class="form-textarea" id="special-note-text" rows="3"
+            placeholder="e.g. NEED TO REPLACE RADIATOR FAN MOTOR (PLAY)" required></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-special-note')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Note</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- pdf-lib PDF Generation -->
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+
   <!-- Firebase Compat Scripts -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -558,11 +657,13 @@
   <!-- Application Scripts -->
   <script src="config/firebase.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/pdf.js"></script>
   <script src="js/jobcards.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/customers.js"></script>
   <script src="js/billing.js"></script>
   <script src="js/reports.js"></script>
+  <script src="js/vehiclehistory.js"></script>
   <script src="js/app.js"></script>
 </body>
 

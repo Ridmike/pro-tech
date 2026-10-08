@@ -1,0 +1,610 @@
+/**
+ * ProTech ERP - Invoice PDF Generator
+ * Uses pdf-lib (browser CDN) to create downloadable invoices
+ * featuring the ProTech Automobile official letterhead (letterhead.jpeg).
+ */
+
+window.ProTechPDF = {
+
+  loadLetterheadImage: async function (doc) {
+    const paths = [
+      'assets/images/letterhead.jpeg',
+      '../assets/images/letterhead.jpeg',
+      '../../assets/images/letterhead.jpeg'
+    ];
+
+    for (const p of paths) {
+      try {
+        const res = await fetch(p);
+        if (res.ok) {
+          const buffer = await res.arrayBuffer();
+          const img = await doc.embedJpg(buffer);
+          console.log('[PDF] Successfully loaded letterhead image from:', p);
+          return img;
+        }
+      } catch (err) {
+        // try next candidate path
+      }
+    }
+    console.warn('[PDF] Letterhead image fetch failed across candidate paths.');
+    return null;
+  },
+
+  /**
+   * Generate and download a ProTech branded invoice PDF from a job card object.
+   * @param {Object} jc - The job card data object
+   */
+  generateInvoice: async function (jc) {
+    if (!jc) {
+      alert('No job card data available to generate invoice.');
+      return;
+    }
+
+    try {
+
+    const { PDFDocument, rgb, StandardFonts } = PDFLib;
+
+    const doc = await PDFDocument.create();
+    let page = doc.addPage([595, 842]); // A4 Page – reassigned for multi-page support
+
+    const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
+    const regularFont = await doc.embedFont(StandardFonts.Helvetica);
+    const italicFont = await doc.embedFont(StandardFonts.HelveticaOblique);
+
+    const W = 595;
+    const margin = 30;
+    const contentW = W - margin * 2;
+
+    // ─── COLOR PALETTE ───────────────────────────────────────────
+    const darkBlue = rgb(0.11, 0.20, 0.40);  // #1C3366
+    const midBlue = rgb(0.15, 0.38, 0.70);  // Accent table headers
+    const lightBlue = rgb(0.80, 0.88, 0.97);  // Section highlights
+    const tableHeaderBg = rgb(0.11, 0.20, 0.40);
+    const rowAlt = rgb(0.94, 0.96, 0.99);
+    const white = rgb(1, 1, 1);
+    const black = rgb(0, 0, 0);
+    const grey = rgb(0.55, 0.55, 0.55);
+    const golden = rgb(0.85, 0.70, 0.10);
+
+    // ─── HELPER FUNCTIONS ────────────────────────────────────────
+    const drawRect = (x, y, w, h, color) => {
+      page.drawRectangle({ x, y: y - h, width: w, height: h, color });
+    };
+
+    const drawRectBorder = (x, y, w, h, borderColor, borderWidth = 0.5) => {
+      page.drawRectangle({
+        x, y: y - h, width: w, height: h,
+        color: undefined,
+        borderColor,
+        borderWidth
+      });
+    };
+
+    const text = (str, x, y, { font = regularFont, size = 9, color = black, rowH = 0 } = {}) => {
+      // Vertically center text within rowH if provided
+      const vy = rowH > 0 ? y - (rowH - size) / 2 - size : y - size;
+      page.drawText(String(str || ''), { x, y: vy, font, size, color });
+    };
+
+    const textCenter = (str, x, y, w, { font = regularFont, size = 9, color = black, rowH = 0 } = {}) => {
+      const textW = font.widthOfTextAtSize(String(str || ''), size);
+      const cx = x + (w - textW) / 2;
+      // Vertically center text within rowH if provided
+      const vy = rowH > 0 ? y - (rowH - size) / 2 - size : y - size;
+      page.drawText(String(str || ''), { x: cx, y: vy, font, size, color });
+    };
+
+    const textRight = (str, x, y, w, { font = regularFont, size = 9, color = black, rowH = 0 } = {}) => {
+      const textW = font.widthOfTextAtSize(String(str || ''), size);
+      // Vertically center text within rowH if provided
+      const vy = rowH > 0 ? y - (rowH - size) / 2 - size : y - size;
+      page.drawText(String(str || ''), { x: x + w - textW, y: vy, font, size, color });
+    };
+
+    const lkr = (amount) => `LKR ${(Number(amount) || 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const num = (amount) => (Number(amount) || 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const drawLine = (x1, y1, x2, y2, color = rgb(0.7, 0.7, 0.7), thickness = 0.5) => {
+      page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness, color });
+    };
+
+    let y = 842;
+
+    // ─── MULTI-PAGE SUPPORT ──────────────────────────────────────
+    // Footer + signatures occupy y=32–140 on every page.
+    // Trigger a new page when content gets within 15pt of the signature box.
+    const BOTTOM_MARGIN = 55;
+    const PAGE_CONTENT_TOP = 820; // where new-page content starts
+
+    const startNewPage = () => {
+      // Watermark on the page we're leaving
+      page.drawText('PRO TECH AUTOMOBILE', {
+        x: 60, y: 280, font: boldFont, size: 40,
+        color: rgb(0.85, 0.88, 0.94), opacity: 0.15,
+        rotate: { type: 'degrees', angle: 25 }
+      });
+      // Create fresh page – ALL helpers reference `page` by closure so
+      // this single reassignment is enough to redirect every draw call.
+      page = doc.addPage([595, 842]);
+      y = PAGE_CONTENT_TOP;
+      // Thin accent bar at top of continuation page
+      page.drawRectangle({ x: 0, y: y - 4, width: W, height: 4, color: midBlue });
+      y -= 4 + 8;
+    };
+
+    // Callback invoked after every page break to re-draw the active table header
+    let onNewPage = null;
+
+    const checkPage = (neededH = 20) => {
+      if (y - neededH < BOTTOM_MARGIN) {
+        startNewPage();
+        if (onNewPage) onNewPage(); // Re-draw table header on the new page
+      }
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // 1. TOP LETTERHEAD HEADER (letterhead.jpeg)
+    // ═══════════════════════════════════════════════════════════
+    const letterheadImg = await this.loadLetterheadImage(doc);
+
+    if (letterheadImg) {
+      const headerH = 145; // Height of official letterhead banner
+      page.drawImage(letterheadImg, {
+        x: 0,
+        y: y - headerH,
+        width: W,
+        height: headerH
+      });
+      y -= headerH;
+    } else {
+      // Fallback programmatic banner if image is not accessible
+      const headerH = 80;
+      drawRect(0, y, W, headerH, darkBlue);
+      y -= 5;
+      text('PRO TECH AUTOMOBILE', margin + 5, y - 8, { font: boldFont, size: 22, color: white });
+      text('Smart  >  Fast  >  Reliable', margin + 8, y - 32, { font: italicFont, size: 10, color: rgb(0.75, 0.85, 1.0) });
+      text('No.276/1/A, Udumulla, Mulleriyawa New Town.', margin + 8, y - 47, { font: regularFont, size: 8, color: rgb(0.85, 0.90, 1.0) });
+
+      const rightColX = W - 190;
+      text('+94773532095', rightColX, y - 8, { font: boldFont, size: 9, color: white });
+      text('protechautomobile07@gmail.com', rightColX, y - 22, { font: regularFont, size: 8, color: rgb(0.85, 0.90, 1.0) });
+      text('Pro Tech Automobile', rightColX, y - 36, { font: regularFont, size: 8, color: rgb(0.85, 0.90, 1.0) });
+      y -= headerH - 5;
+    }
+
+    // Thin accent line below header
+    drawRect(0, y, W, 4, midBlue);
+    y -= 4 + 6; // 6pt padding above customer info box
+
+    // ═══════════════════════════════════════════════════════════
+    // 2. CUSTOMER & INVOICE INFO SECTION
+    // ═══════════════════════════════════════════════════════════
+    const infoH = 50; // Increased height for inner top/bottom padding
+    drawRect(0, y, W, infoH, lightBlue);
+    y -= 13; // 13pt top padding inside info box
+
+    // Customer Info
+    text('CUSTOMER NAME  :-', margin, y, { font: boldFont, size: 9, color: black });
+    text(`${jc.customer_name || 'MR. SHAKIL RIDMIKE'}`, margin + 110, y, { font: boldFont, size: 9, color: darkBlue });
+
+    text('CONTACT NUMBER :-', margin, y - 18, { font: boldFont, size: 9, color: black });
+    text(`${jc.customer_phone || '0766368845'}`, margin + 110, y - 18, { font: regularFont, size: 9, color: black });
+
+    // Invoice Info
+    const invX = W / 2 + 40;
+    text('IN. NO. :-', invX, y, { font: boldFont, size: 9, color: black });
+    text(`${jc.job_card_id || jc.id || '43'}`, invX + 60, y, { font: boldFont, size: 9, color: darkBlue });
+
+    const today = new Date().toLocaleDateString('en-LK');
+    text('DATE.   :-', invX, y - 18, { font: boldFont, size: 9, color: black });
+    text(today, invX + 60, y - 18, { font: regularFont, size: 9, color: black });
+
+    y -= (infoH - 13) + 8; // 8pt padding below customer info box
+
+    // ═══════════════════════════════════════════════════════════
+    // 3. VEHICLE INFO TABLE
+    // ═══════════════════════════════════════════════════════════
+    const colPlate = contentW * 0.40;
+    const colModel = contentW * 0.35;
+    const colMile = contentW * 0.25;
+
+    const vehHeaderH = 18;
+    drawRect(margin, y, colPlate, vehHeaderH, darkBlue);
+    drawRect(margin + colPlate, y, colModel, vehHeaderH, darkBlue);
+    drawRect(margin + colPlate + colModel, y, colMile, vehHeaderH, darkBlue);
+
+    textCenter('VEHICLE REGISTRATION NUMBER', margin, y, colPlate, { font: boldFont, size: 8, color: white, rowH: vehHeaderH });
+    textCenter('MODEL', margin + colPlate, y, colModel, { font: boldFont, size: 8, color: white, rowH: vehHeaderH });
+    textCenter('MILEAGE', margin + colPlate + colModel, y, colMile, { font: boldFont, size: 8, color: white, rowH: vehHeaderH });
+    y -= vehHeaderH;
+
+    const vehRowH = 18;
+    drawRect(margin, y, colPlate, vehRowH, rowAlt);
+    drawRect(margin + colPlate, y, colModel, vehRowH, white);
+    drawRect(margin + colPlate + colModel, y, colMile, vehRowH, white);
+    drawRectBorder(margin, y + 1, contentW, vehRowH, rgb(0.5, 0.5, 0.5));
+
+    const parts = jc.parts || [];
+    const makeModelParts = (jc.vehicle_make_model || '').split(' ');
+    const modelName = makeModelParts.slice(1).join(' ') || jc.vehicle_make_model || 'AQUA';
+
+    textCenter(jc.vehicle_plate || 'WP KY-5728', margin, y, colPlate, { font: boldFont, size: 9, color: darkBlue, rowH: vehRowH });
+    textCenter(modelName, margin + colPlate, y, colModel, { font: boldFont, size: 9, color: black, rowH: vehRowH });
+    textCenter(`${jc.mileage_at_intake ? jc.mileage_at_intake.toLocaleString() + ' Km' : '176 705 Km'}`, margin + colPlate + colModel, y, colMile, { font: regularFont, size: 9, color: black, rowH: vehRowH });
+    y -= vehRowH + 4;
+
+    // ═══════════════════════════════════════════════════════════
+    // 4. CUSTOMER REQUEST ROW
+    // ═══════════════════════════════════════════════════════════
+    const reqH = 18;
+    const reqLabelW = contentW * 0.35;
+    drawRect(margin, y, reqLabelW, reqH, darkBlue);
+    drawRect(margin + reqLabelW, y, contentW - reqLabelW, reqH, lightBlue);
+
+    textCenter('CUSTOMER REQUEST', margin, y, reqLabelW, { font: boldFont, size: 8.5, color: white, rowH: reqH });
+    text((jc.problem || 'REPAIR BRAKE FLUID LEAK').toUpperCase(), margin + reqLabelW + 8, y, { font: boldFont, size: 8.5, color: black, rowH: reqH });
+    y -= reqH + 6;
+
+    // ═══════════════════════════════════════════════════════════
+    // 5. PRODUCTS / PARTS TABLE
+    // ═══════════════════════════════════════════════════════════
+    const pColSno = 28;
+    const pColDesc = contentW * 0.42;
+    const pColQty = contentW * 0.09;
+    const pColUnit = contentW * 0.14;
+    const pColDisc = contentW * 0.10;
+    const pColNet = contentW - pColSno - pColDesc - pColQty - pColUnit - pColDisc;
+
+    // Header
+    const pHeaderH = 17;
+    let px = margin;
+    const partsHeaderCols = [
+      { w: pColSno, label: 'S. NO.' },
+      { w: pColDesc, label: 'PRODUCT DESCRIPTION' },
+      { w: pColQty, label: 'QUANTITY' },
+      { w: pColUnit, label: 'UNIT PRICE' },
+      { w: pColDisc, label: 'DISCOUNT' },
+      { w: pColNet, label: 'NET AMOUNT' }
+    ];
+
+    // Reusable parts header draw function (called on first render + after page breaks)
+    const drawPartsHeader = () => {
+      let px = margin;
+      partsHeaderCols.forEach(col => {
+        drawRect(px, y, col.w, pHeaderH, darkBlue);
+        textCenter(col.label, px, y, col.w, { font: boldFont, size: 7.5, color: white, rowH: pHeaderH });
+        px += col.w;
+      });
+      y -= pHeaderH;
+    };
+
+    checkPage(pHeaderH + 16 * 2);
+    drawPartsHeader();
+
+    // Parts Data Rows
+    let partsTotal = 0;
+    const minPartRows = Math.max((parts.length || 0), 4);
+    onNewPage = drawPartsHeader; // Re-draw parts header on page break
+    for (let i = 0; i < minPartRows; i++) {
+      const p = parts[i];
+      const rowH = 16;
+      checkPage(rowH); // Add new page if this row would overflow
+      const bg = i % 2 === 0 ? white : rowAlt;
+      drawRect(margin, y, contentW, rowH, bg);
+      drawRectBorder(margin, y + 1, contentW, rowH, rgb(0.75, 0.75, 0.75));
+
+      if (p) {
+        const lineTotal = (p.sell_price || 0) * (p.qty || 1);
+        partsTotal += lineTotal;
+        let px2 = margin;
+        textCenter(String(i + 1), px2, y, pColSno, { size: 8.5, rowH }); px2 += pColSno;
+        textCenter(p.part_name || '', px2, y, pColDesc, { size: 8, rowH }); px2 += pColDesc;
+        textCenter(String(p.qty || 1), px2, y, pColQty, { size: 8.5, rowH }); px2 += pColQty;
+        textRight(num(p.sell_price), px2, y, pColUnit - 4, { size: 8.5, rowH }); px2 += pColUnit;
+        textCenter('-', px2, y, pColDisc, { size: 8.5, color: grey, rowH }); px2 += pColDisc;
+        textRight(num(lineTotal), px2, y, pColNet - 4, { size: 8.5, font: boldFont, rowH });
+      }
+      y -= rowH;
+    }
+
+    onNewPage = null; // Done with parts table
+
+    // Sub amount row for parts (matches labor sub amount box width and layout)
+    checkPage(17 + 20);
+    const pSubH = 17;
+    const pSubW = contentW * 0.50;
+    const pSubX = margin + contentW * 0.50;
+    const pValW = pSubW * 0.42;
+    const pLblW = pSubW - pValW;
+    drawRect(pSubX, y, pSubW, pSubH, lightBlue);
+    drawRectBorder(pSubX, y + 1, pSubW, pSubH, rgb(0.5, 0.5, 0.5));
+    textCenter('SUB AMOUNT', pSubX, y, pLblW, { font: boldFont, size: 8, color: darkBlue, rowH: pSubH });
+    textRight(num(partsTotal), pSubX + pLblW, y, pValW - 4, { font: boldFont, size: 8.5, color: darkBlue, rowH: pSubH });
+    y -= pSubH + 8; // Gap after products sub-amount (matches labor table gap)
+
+    // ═══════════════════════════════════════════════════════════
+    // 6. SERVICES / LABOR TABLE
+    // ═══════════════════════════════════════════════════════════
+    const labor = jc.labor || [];
+    const lColSno = 28;
+    const lColDesc = contentW * 0.52;
+    const lColHrs = contentW * 0.10;
+    const lColRate = contentW * 0.17;
+    const lColNet = contentW - lColSno - lColDesc - lColHrs - lColRate;
+
+    // Header
+    const lHeaderH = 17;
+    let lx = margin;
+    const laborHeaderCols = [
+      { w: lColSno, label: 'S.NO.' },
+      { w: lColDesc, label: 'SERVICE DESCRIPTION' },
+      { w: lColHrs, label: 'HOURS' },
+      { w: lColRate, label: 'UNIT PRICE' },
+      { w: lColNet, label: 'NET AMOUNT' }
+    ];
+
+    // Reusable labor header draw function (called on first render + after page breaks)
+    const drawLaborHeader = () => {
+      let lx = margin;
+      laborHeaderCols.forEach(col => {
+        drawRect(lx, y, col.w, lHeaderH, darkBlue);
+        textCenter(col.label, lx, y, col.w, { font: boldFont, size: 7.5, color: white, rowH: lHeaderH });
+        lx += col.w;
+      });
+      y -= lHeaderH;
+    };
+
+    checkPage(lHeaderH + 16 * 2);
+    drawLaborHeader();
+
+    // Labor Data Rows
+    let laborTotal = 0;
+    const minLaborRows = Math.max((labor.length || 0), 4);
+    onNewPage = drawLaborHeader; // Re-draw labor header on page break
+    for (let i = 0; i < minLaborRows; i++) {
+      const l = labor[i];
+      const rowH = 16;
+      checkPage(rowH); // Add new page if this row would overflow
+      const bg = i % 2 === 0 ? white : rowAlt;
+      drawRect(margin, y, contentW, rowH, bg);
+      drawRectBorder(margin, y + 1, contentW, rowH, rgb(0.75, 0.75, 0.75));
+
+      if (l) {
+        const lineTotal = (l.hours || 0) * (l.rate || 0);
+        laborTotal += lineTotal;
+        let lx2 = margin;
+        textCenter(String(i + 1), lx2, y, lColSno, { size: 8.5, rowH }); lx2 += lColSno;
+        textCenter(l.description || '', lx2, y, lColDesc, { size: 8, rowH }); lx2 += lColDesc;
+        textCenter(String(l.hours || ''), lx2, y, lColHrs, { size: 8.5, rowH }); lx2 += lColHrs;
+        textRight(num(l.rate), lx2, y, lColRate - 4, { size: 8.5, rowH }); lx2 += lColRate;
+        textRight(num(lineTotal), lx2, y, lColNet - 4, { font: boldFont, size: 8.5, rowH });
+      }
+      y -= rowH;
+    }
+
+    onNewPage = null; // Done with labor table
+
+    // Sub amount row for labor
+    checkPage(16 + 20); // Ensure labor sub-amount row has space
+
+    // ═══════════════════════════════════════════════════════════
+    // 7. TOTALS SUMMARY BLOCK
+    // ═══════════════════════════════════════════════════════════
+    const grandTotal = partsTotal + laborTotal;
+    const totalLabelX = margin + contentW * 0.50;
+    const totalW = contentW * 0.50;
+
+    const drawTotalRow = (label, value, bgColor, textColor = black, isLast = false) => {
+      const rowH = 17;
+      drawRect(totalLabelX, y, totalW, rowH, bgColor);
+      drawRectBorder(totalLabelX, y + 1, totalW, rowH, rgb(0.5, 0.5, 0.5));
+      const valW = totalW * 0.42;
+      const lblW = totalW - valW;
+      // Both label and value are vertically centered within rowH
+      textCenter(label, totalLabelX, y, lblW, { font: boldFont, size: isLast ? 8.5 : 8, color: textColor, rowH });
+      textRight(value, totalLabelX + lblW, y, valW - 4, { font: boldFont, size: isLast ? 9.5 : 8.5, color: textColor, rowH });
+      y -= rowH;
+    };
+
+    // Totals block = 4 rows × 17pt + 6pt gap = 74pt. Ensure it all fits before drawing.
+    checkPage(74);
+    drawTotalRow('SUB AMOUNT', num(laborTotal), lightBlue, darkBlue);
+    y -= 6; // Gap between SUB AMOUNT and INVOICE TOTAL AMOUNT
+    drawTotalRow('INVOICE TOTAL AMOUNT', num(grandTotal), darkBlue, white);
+    drawTotalRow('ADVANCE PAYMENT', '-', rowAlt, black);
+    drawTotalRow('NET AMOUNT TO PAY', lkr(grandTotal), darkBlue, golden, true);
+
+    // ═══════════════════════════════════════════════════════════
+    // 8. SIGNATURE BOXES (ANCHORED NEAR BOTTOM OF A4 PAGE)
+    // ═══════════════════════════════════════════════════════════
+    const sigY = 140;
+    const sigW = 160;
+    const sigH = 34;
+
+    drawRect(margin, sigY, sigW, sigH, rgb(0.92, 0.92, 0.92));
+    drawRectBorder(margin, sigY, sigW, sigH, rgb(0.6, 0.6, 0.6));
+    text('......................................', margin + 20, sigY - 8, { color: grey, size: 8 });
+    textCenter('Prepared By', margin, sigY - 24, sigW, { font: boldFont, size: 8.5, color: black });
+
+    drawRect(margin + sigW + 20, sigY, sigW, sigH, rgb(0.92, 0.92, 0.92));
+    drawRectBorder(margin + sigW + 20, sigY, sigW, sigH, rgb(0.6, 0.6, 0.6));
+    text('......................................', margin + sigW + 40, sigY - 8, { color: grey, size: 8 });
+    textCenter('Authorised By', margin + sigW + 20, sigY - 24, sigW, { font: boldFont, size: 8.5, color: black });
+
+    // ═══════════════════════════════════════════════════════════
+    // 9. BACKGROUND WATERMARK (on the last / current page)
+    // ═══════════════════════════════════════════════════════════
+    page.drawText('PRO TECH AUTOMOBILE', {
+      x: 60, y: 280,
+      font: boldFont, size: 40,
+      color: rgb(0.85, 0.88, 0.94),
+      opacity: 0.15,
+      rotate: { type: 'degrees', angle: 25 }
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // 10. FOOTER THANK YOU MESSAGE (ANCHORED AT VERY BOTTOM OF A4 PAGE)
+    // ═══════════════════════════════════════════════════════════
+    drawLine(margin, 80, W - margin, 80, midBlue, 1.5);
+    textCenter('THANK YOU FOR YOUR CHOISE !!!', margin, 62, contentW, { font: boldFont, size: 10, color: midBlue });
+    textCenter('COME AGAIN....', margin, 46, contentW, { font: italicFont, size: 9, color: midBlue });
+    drawLine(margin, 32, W - margin, 32, midBlue, 1.5);
+
+    // ═══════════════════════════════════════════════════════════
+    // PAGE 2 – SPECIAL NOTES & SERVICE CHECKLIST (always included)
+    // ═══════════════════════════════════════════════════════════
+    page = doc.addPage([595, 842]);
+    y = 820;
+
+    // Watermark on page 2
+    page.drawText('PRO TECH AUTOMOBILE', {
+      x: 60, y: 280, font: boldFont, size: 40,
+      color: rgb(0.85, 0.88, 0.94), opacity: 0.15,
+      rotate: { type: 'degrees', angle: 25 }
+    });
+
+    // ── Text-wrap helper ─────────────────────────────────────
+    const wrapText = (str, maxW, fnt, sz) => {
+      const words = String(str || '').split(' ');
+      const lines = [];
+      let cur = '';
+      for (const w of words) {
+        const test = cur ? cur + ' ' + w : w;
+        if (fnt.widthOfTextAtSize(test, sz) > maxW) {
+          if (cur) lines.push(cur);
+          cur = w;
+        } else { cur = test; }
+      }
+      if (cur) lines.push(cur);
+      return lines;
+    };
+
+    // ── 2A. SPECIAL NOTES TABLE ──────────────────────────────
+    const snColSno   = 35;
+    const snColNotes = contentW - snColSno;
+    const snHeaderH  = 20;
+
+    drawRect(margin, y, snColSno, snHeaderH, darkBlue);
+    drawRect(margin + snColSno, y, snColNotes, snHeaderH, darkBlue);
+    textCenter('S.NO.', margin, y, snColSno, { font: boldFont, size: 8, color: white, rowH: snHeaderH });
+    textCenter('SPECIAL NOTES', margin + snColSno, y, snColNotes, { font: boldFont, size: 9, color: white, rowH: snHeaderH });
+    y -= snHeaderH;
+
+    // Parse special_notes array (added via the Special Notes table in job card modal)
+    const rawDiag = Array.isArray(jc.special_notes) ? jc.special_notes.filter(Boolean) : [];
+    const minNoteRows = Math.max(rawDiag.length, 8);
+    for (let i = 0; i < minNoteRows; i++) {
+      const note = rawDiag[i] || '';
+      const noteRowH = 18;
+      const bg2 = i % 2 === 0 ? white : rowAlt;
+      drawRect(margin, y, snColSno, noteRowH, bg2);
+      drawRect(margin + snColSno, y, snColNotes, noteRowH, bg2);
+      drawRectBorder(margin, y + 1, contentW, noteRowH, rgb(0.75, 0.75, 0.75));
+      const numColor = note ? black : rgb(0.78, 0.78, 0.78);
+      textCenter(String(i + 1), margin, y, snColSno, { size: 8, rowH: noteRowH, color: numColor });
+      if (note) {
+        text(note, margin + snColSno + 6, y, { size: 8, rowH: noteRowH });
+      }
+      y -= noteRowH;
+    }
+
+    y -= 12;
+
+    // ── 2B. REMEMBER BLOCK ───────────────────────────────────
+    const remH = 22;
+    drawRect(margin, y, contentW, remH, rgb(0.82, 0.10, 0.10));
+    textCenter('REMEMBER', margin, y, contentW, { font: boldFont, size: 11, color: white, rowH: remH });
+    y -= remH + 6;
+
+    const warnStr = 'AFTER INSTALING THE SPARE PARTS BROUGHT BY THE CUSTOMER, IN THE EVENT OF ANY DEFECT ( DUE TO A DEFECT IN THOSESPARE PARTS ), A FEE WILL BE CHARGED FOR THE DISASSEMBLE AND REASSEMBLE.';
+    const warnLines = wrapText(warnStr, contentW - 16, italicFont, 8.5);
+    for (const wl of warnLines) {
+      text(wl, margin + 8, y, { font: italicFont, size: 8.5, color: rgb(0.78, 0.08, 0.08) });
+      y -= 16; // Line height for warning text
+    }
+
+    y -= 18; // Gap between warning text and SERVICE FUNCTIONS header
+
+    // ── 2C. SERVICE FUNCTIONS HEADER ─────────────────────────
+    const sfH = 18;
+    drawRect(margin, y, contentW, sfH, darkBlue);
+    textCenter('SERVICE FUNCTIONS', margin, y, contentW, { font: boldFont, size: 9, color: white, rowH: sfH });
+    y -= sfH + 8; // Gap below SERVICE FUNCTIONS header before first section title
+
+    // ── Helper: draw a grey bullet section title ─────────────
+    const drawSectionTitle = (label) => {
+      const sh = 17;
+      drawRect(margin, y, contentW, sh, rgb(0.88, 0.88, 0.88));
+      text(label, margin + 5, y, { font: boldFont, size: 7.5, color: black, rowH: sh });
+      y -= sh + 8; // Gap below section title before list items
+    };
+
+    // ── Helper: draw numbered list items ────────────────────
+    const drawListItems = (items) => {
+      items.forEach((item, idx) => {
+        const isSpecial = idx === items.length - 1 && item.startsWith('CHEMICALS');
+        const prefix = isSpecial ? '-' : `${idx + 1}`;
+        const fnt = isSpecial ? italicFont : regularFont;
+        text(`${prefix}    ${item}`, margin + 10, y, { font: fnt, size: 7.5, color: black });
+        y -= 15; // Line height for each list item
+      });
+      y -= 12; // Gap after last item before next section title
+    };
+
+    // ── 2D. LUBE SERVICE LIST ────────────────────────────────
+    drawSectionTitle('>> NORMAL LUBE SERVICE WITH GENUINE ENGINE OIL AND GENUINE OIL FILTER :-');
+    drawListItems([
+      'REPLACE GENUINE ENGINE OIL WITH DRAIN GASKET',
+      'REPLACE EGENUINE ENGINE OIL FILTER',
+      'CLEANE / REPLACE AIR FILTER',
+      'CHECK FRONT AND REAR BRAKES AND ROTATE WHEELS',
+      'CHECK / TOPUP RADIATOR COOLANT AND INVETER/INTERCOOLER COOLANT',
+      'CHECK / TOPUP ATF FLUID',
+      'CHECK / TOPUP BRAKE FLUID',
+      'CHECK / TOPUP AUXILARY BATTERY DISTIL WATER LEVEL',
+      'CHECK FRONT AND REAR SUSPENSSION SYSTEM',
+      'CHECK DRIVE BELT, WIPER BLADES, BULBS, MIRROR AND SHUTTER CONDITION',
+      'CLEAN / REPLACE AC FILTER',
+      'CLEAN HV BATTERY BLOWER'
+    ]);
+
+    // ── 2E. TUNE-UP LIST ─────────────────────────────────────
+    drawSectionTitle('>> TUNE - UP ENGINE WITH USING "O" RING , GLOWMAT AND CHEMICALS :-');
+    drawListItems([
+      'REMOVE , CLEAN , CHECK AND REFIT FUEL INJECTORS USING O RINGS AND GLOWMATS',
+      'REMOVE , CLEAN  AND REFIT SPARK PLUGS AND TUNE-UP ENGINE',
+      'REMOVE , CLEAN AND REFIT EGR VALVE AND EGR COOLER',
+      'REMOVE , CLEAN AND REFIT INLET MANIFOLD ASSY',
+      'REMOVE , CLEAN AND REFIT TROTLE BODY',
+      'CHECK , RESET AND INITIALIZE EFI SYSTEM',
+      'CHEMICALS :- INJECTOR / TROTLE BODY CLEANER, ENGINE CONDITIONER, BRAKE PARTS CLEANER....'
+    ]);
+
+    // ── 2F. PAGE 2 FOOTER ────────────────────────────────────
+    drawLine(margin, 80, W - margin, 80, midBlue, 1.5);
+    textCenter('THANK YOU FOR YOUR CHOISE !!!', margin, 62, contentW, { font: boldFont, size: 10, color: midBlue });
+    textCenter('COME AGAIN....', margin, 46, contentW, { font: italicFont, size: 9, color: midBlue });
+    drawLine(margin, 32, W - margin, 32, midBlue, 1.5);
+
+      // ─── SAVE AND TRIGGER DOWNLOAD ───────────────────────────
+      const pdfBytes = await doc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+
+      const filename = `ProTech_Invoice_${jc.job_card_id || jc.id}_${jc.vehicle_plate}.pdf`;
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+      console.log(`[PDF] Downloaded: ${filename}`);
+
+    } catch (err) {
+      console.error('[PDF] Generation error:', err);
+      alert('PDF generation failed: ' + err.message);
+    }
+  }
+};

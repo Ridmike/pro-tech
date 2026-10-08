@@ -13,6 +13,11 @@ window.openModal = function(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
     modal.classList.add('open');
+    // Auto-focus the first focusable input inside the modal so typing works immediately
+    setTimeout(() => {
+      const firstInput = modal.querySelector('input, textarea, select');
+      if (firstInput) firstInput.focus();
+    }, 50);
   }
 };
 
@@ -20,6 +25,8 @@ window.closeModal = function(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
     modal.classList.remove('open');
+    // Return focus to body so nothing is left in a trapped state
+    document.body.focus();
   }
 };
 
