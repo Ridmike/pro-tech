@@ -34,7 +34,7 @@ window.GarageFlowBilling = {
           <td>${window.formatLKR(balance)}</td>
           <td>${statusBadge}</td>
           <td>
-            <button class="btn btn-primary btn-sm" onclick="window.GarageFlowBilling.downloadInvoice('${jc.id}')">⬇ Download PDF</button>
+            <button class="btn btn-primary btn-sm" onclick="window.GarageFlowBilling.downloadInvoice('${jc.id}')"><svg style="width:13px;height:13px;vertical-align:-2px;margin-right:4px;fill:currentColor;display:inline-block;" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Download PDF</button>
           </td>
         </tr>
       `;

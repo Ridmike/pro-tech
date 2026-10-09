@@ -172,9 +172,9 @@ window.GarageFlowVehicleHistory = {
                 <span class="badge ${statusClass}">${jc.status || 'Received'}</span>
                 <span class="vh-entry-jcid">${jc.job_card_id || jc.id}</span>
               </div>
-              <div class="vh-entry-mileage">
-                <span class="vh-mileage-icon">&#128205;</span>
-                ${(Number(jc.mileage_at_intake) || 0).toLocaleString()} km
+              <div class="vh-entry-mileage" style="display:flex; align-items:center; gap:0.5rem;">
+                <span><span class="vh-mileage-icon">&#128205;</span> ${(Number(jc.mileage_at_intake) || 0).toLocaleString()} km</span>
+                <button class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="window.GarageFlowBilling.downloadInvoice('${jc.id}')" title="Download Invoice PDF"><svg style="width:12px;height:12px;vertical-align:-1px;margin-right:3px;fill:currentColor;display:inline-block;" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Invoice PDF</button>
               </div>
             </div>
 
