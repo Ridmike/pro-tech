@@ -262,7 +262,39 @@ window.GarageFlowJobCards = {
       return;
     }
 
-    const jobCardId = `JC-${Math.floor(1000 + Math.random() * 9000)}`;
+    // Generate sequential PT-#### job card ID
+    let jobCardId = 'PT-0001';
+    try {
+      // Find the highest existing PT number across all job cards
+      const allExisting = this.activeJobCards
+        .map(j => j.job_card_id || '')
+        .filter(id => /^PT-\d+$/.test(id))
+        .map(id => parseInt(id.replace('PT-', ''), 10))
+        .filter(n => !isNaN(n));
+
+      // Also query Firestore to catch any delivered/archived cards not in activeJobCards
+      if (window.GarageFlowFirebase && window.GarageFlowFirebase.db) {
+        const snapshot = await window.GarageFlowFirebase.db
+          .collection('job_cards')
+          .orderBy('created_at', 'desc')
+          .get();
+        snapshot.forEach(doc => {
+          const id = doc.data().job_card_id || '';
+          if (/^PT-\d+$/.test(id)) {
+            const n = parseInt(id.replace('PT-', ''), 10);
+            if (!isNaN(n)) allExisting.push(n);
+          }
+        });
+      }
+
+      const maxNum = allExisting.length > 0 ? Math.max(...allExisting) : 0;
+      const nextNum = maxNum + 1;
+      jobCardId = `PT-${String(nextNum).padStart(4, '0')}`;
+    } catch (e) {
+      console.warn('[JobCards] Could not determine next PT number, using timestamp fallback:', e);
+      jobCardId = `PT-${Date.now().toString().slice(-4)}`;
+    }
+
 
     let timestamp = new Date();
     if (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) {
