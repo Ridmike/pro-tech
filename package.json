@@ -27,6 +27,12 @@
         "to": ".env"
       }
     ],
+    "extraResources": [
+      {
+        "from": ".env",
+        "to": ".env"
+      }
+    ],
     "win": {
       "target": [
         {
