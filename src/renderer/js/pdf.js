@@ -304,14 +304,18 @@ window.ProTechPDF = {
         drawRect(margin, y, contentW, rowH, bg);
         drawRectBorder(margin, y + 1, contentW, rowH, rgb(0.75, 0.75, 0.75));
         if (p) {
-          const lineTotal = (p.sell_price || 0) * (p.qty || 1);
+          const discountPct = p.discount || 0;
+          const grossTotal  = (p.sell_price || 0) * (p.qty || 1);
+          const discountAmt = grossTotal * (discountPct / 100);
+          const lineTotal   = grossTotal - discountAmt;
           partsTotal += lineTotal;
+          const discLabel = discountPct > 0 ? `${discountPct}%` : '-';
           let px2 = margin;
           textCenter(String(i + 1), px2, y, pColSno, { size: 8.5, rowH }); px2 += pColSno;
           text(p.part_name || '', px2 + 6, y, { size: 8, rowH, maxW: pColDesc - 12 }); px2 += pColDesc;
           textCenter(String(p.qty || 1), px2, y, pColQty, { size: 8.5, rowH }); px2 += pColQty;
           textRight(num(p.sell_price), px2, y, pColUnit - 4, { size: 8.5, rowH }); px2 += pColUnit;
-          textCenter('-', px2, y, pColDisc, { size: 8.5, color: grey, rowH }); px2 += pColDisc;
+          textCenter(discLabel, px2, y, pColDisc, { size: 8.5, color: discountPct > 0 ? rgb(0.85, 0.60, 0.10) : grey, rowH }); px2 += pColDisc;
           textRight(num(lineTotal), px2, y, pColNet - 4, { size: 8.5, font: boldFont, rowH });
         }
         y -= rowH;

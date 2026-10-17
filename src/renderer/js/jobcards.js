@@ -411,12 +411,17 @@ window.GarageFlowJobCards = {
       partsTbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-dim);">No parts added to this job card yet.</td></tr>`;
     } else {
       partsTbody.innerHTML = parts.map((p, idx) => {
-        const lineSellTotal = (p.sell_price || 0) * (p.qty || 1);
+        const discountPct  = p.discount || 0;
+        const discountAmt  = (p.sell_price || 0) * (p.qty || 1) * (discountPct / 100);
+        const lineSellGross = (p.sell_price || 0) * (p.qty || 1);
+        const lineSellTotal = lineSellGross - discountAmt;
         const lineCostTotal = (p.cost_price || 0) * (p.qty || 1);
         const margin = lineSellTotal - lineCostTotal;
 
         partsTotal += lineSellTotal;
         partsCostTotal += lineCostTotal;
+
+        const discountLabel = discountPct > 0 ? `${discountPct}%` : '-';
 
         return `
           <tr>
@@ -424,6 +429,7 @@ window.GarageFlowJobCards = {
             <td>${window.formatLKR(p.cost_price)}</td>
             <td>${window.formatLKR(p.sell_price)}</td>
             <td>${p.qty}</td>
+            <td style="color:${discountPct > 0 ? '#f59e0b' : 'inherit'}">${discountLabel}</td>
             <td class="profit-text">+${window.formatLKR(margin)}</td>
             <td><strong>${window.formatLKR(lineSellTotal)}</strong></td>
             <td><button class="btn btn-danger btn-sm" onclick="window.GarageFlowJobCards.deletePart(${idx})">&times;</button></td>
@@ -535,13 +541,14 @@ window.GarageFlowJobCards = {
     const jc = this.activeJobCards.find(j => j.id === this.currentSelectedJobId);
     if (!jc) return;
 
-    const name = document.getElementById('part-name').value.trim();
-    const cost = Number(document.getElementById('part-cost').value) || 0;
-    const sell = Number(document.getElementById('part-sell').value) || 0;
-    const qty = Number(document.getElementById('part-qty').value) || 1;
+    const name     = document.getElementById('part-name').value.trim();
+    const cost     = Number(document.getElementById('part-cost').value) || 0;
+    const sell     = Number(document.getElementById('part-sell').value) || 0;
+    const qty      = Number(document.getElementById('part-qty').value) || 1;
+    const discount = Math.min(100, Math.max(0, Number(document.getElementById('part-discount').value) || 0));
 
     const currentParts = jc.parts || [];
-    currentParts.push({ part_name: name, cost_price: cost, sell_price: sell, qty: qty });
+    currentParts.push({ part_name: name, cost_price: cost, sell_price: sell, qty: qty, discount: discount });
 
     try {
       if (window.GarageFlowFirebase && window.GarageFlowFirebase.db) {
@@ -551,6 +558,7 @@ window.GarageFlowJobCards = {
       }
       window.closeModal('modal-add-part');
       document.getElementById('form-add-part').reset();
+      document.getElementById('part-discount').value = '0';
       this.openDetailModal(this.currentSelectedJobId);
     } catch (err) {
       alert('Failed to add part: ' + err.message);
