@@ -73,19 +73,21 @@ window.ProTechPDF = {
       let y;     // current drawing cursor (top of next element)
 
       // ── helper: draw a full letterhead page background ──────────
-      const applyLetterhead = () => {
-        // Header banner image (full width, top of page)
-        if (imgs.header) {
-          page.drawImage(imgs.header, { x: 0, y: H - HEADER_H, width: W, height: HEADER_H });
-        } else {
-          // Fallback solid banner
-          page.drawRectangle({ x: 0, y: H - HEADER_H, width: W, height: HEADER_H, color: darkBlue });
-          page.drawText('PRO TECH AUTOMOBILE', {
-            x: 140, y: H - 70, font: boldFont, size: 22, color: white
-          });
+      const applyLetterhead = (isFirstPage = false) => {
+        // Header banner image (full width, top of page) ONLY ON 1st PAGE
+        if (isFirstPage) {
+          if (imgs.header) {
+            page.drawImage(imgs.header, { x: 0, y: H - HEADER_H, width: W, height: HEADER_H });
+          } else {
+            // Fallback solid banner
+            page.drawRectangle({ x: 0, y: H - HEADER_H, width: W, height: HEADER_H, color: darkBlue });
+            page.drawText('PRO TECH AUTOMOBILE', {
+              x: 140, y: H - 70, font: boldFont, size: 22, color: white
+            });
+          }
         }
 
-        // Centred logo watermark
+        // Centred logo watermark (on all pages)
         if (imgs.logo) {
           const wSize = 280;
           page.drawImage(imgs.logo, {
@@ -97,7 +99,7 @@ window.ProTechPDF = {
           });
         }
 
-        // Footer stripe image (full width, bottom of page)
+        // Footer stripe image (full width, bottom of page, on all pages)
         if (imgs.footer) {
           page.drawImage(imgs.footer, { x: 0, y: 0, width: W, height: FOOTER_Y });
         } else {
@@ -111,8 +113,23 @@ window.ProTechPDF = {
       // ── helper: start a new page with letterhead ─────────────────
       const newPage = () => {
         page = doc.addPage([W, H]);
-        applyLetterhead();
-        y = H - HEADER_H - 8;
+        const isFirstPage = (doc.getPageCount() === 1);
+        applyLetterhead(isFirstPage);
+        y = isFirstPage ? (H - HEADER_H - 8) : (H - margin - 10);
+      };
+
+      // ── helper: draw thank you message ──────────────────────────
+      const drawThankYou = (yTop = 75, sz1 = 11, sz2 = 9.5) => {
+        textCenter('THANK YOU FOR YOUR CHOISE!!!', 0, yTop, W, {
+          font: boldFont,
+          size: sz1,
+          color: midBlue
+        });
+        textCenter('COME AGAIN....', 0, yTop - (sz1 + 4), W, {
+          font: boldFont,
+          size: sz2,
+          color: midBlue
+        });
       };
 
       // ── draw helpers (all reference the `page` closure var) ──────
@@ -126,8 +143,16 @@ window.ProTechPDF = {
       const _vy = (yTop, sz, rowH) =>
         rowH > 0 ? yTop - (rowH - sz) / 2 - sz : yTop - sz;
 
-      const text = (str, x, yTop, { font = regularFont, size = 9, color = black, rowH = 0 } = {}) =>
-        page.drawText(String(str || ''), { x, y: _vy(yTop, size, rowH), font, size, color });
+      const text = (str, x, yTop, { font = regularFont, size = 9, color = black, rowH = 0, maxW = 0 } = {}) => {
+        let s = String(str || '');
+        if (maxW > 0 && font.widthOfTextAtSize(s, size) > maxW) {
+          while (s.length > 3 && font.widthOfTextAtSize(s + '...', size) > maxW) {
+            s = s.slice(0, -1);
+          }
+          s += '...';
+        }
+        page.drawText(s, { x, y: _vy(yTop, size, rowH), font, size, color });
+      };
 
       const textCenter = (str, x, yTop, w, opts = {}) => {
         const { font = regularFont, size = 9, color = black, rowH = 0 } = opts;
@@ -242,7 +267,7 @@ window.ProTechPDF = {
       const pHeaderH = 17;
       const partsHeaderCols = [
         { w: pColSno,  label: 'S.NO.' },
-        { w: pColDesc, label: 'PRODUCT DESCRIPTION' },
+        { w: pColDesc, label: 'PRODUCT DESCRIPTION', align: 'start' },
         { w: pColQty,  label: 'QTY' },
         { w: pColUnit, label: 'UNIT PRICE' },
         { w: pColDisc, label: 'DISCOUNT' },
@@ -253,7 +278,11 @@ window.ProTechPDF = {
         let px = margin;
         partsHeaderCols.forEach(col => {
           drawRect(px, y, col.w, pHeaderH, darkBlue);
-          textCenter(col.label, px, y, col.w, { font: boldFont, size: 7.5, color: white, rowH: pHeaderH });
+          if (col.align === 'start') {
+            text(col.label, px + 6, y, { font: boldFont, size: 7.5, color: white, rowH: pHeaderH });
+          } else {
+            textCenter(col.label, px, y, col.w, { font: boldFont, size: 7.5, color: white, rowH: pHeaderH });
+          }
           px += col.w;
         });
         y -= pHeaderH;
@@ -275,14 +304,18 @@ window.ProTechPDF = {
         drawRect(margin, y, contentW, rowH, bg);
         drawRectBorder(margin, y + 1, contentW, rowH, rgb(0.75, 0.75, 0.75));
         if (p) {
-          const lineTotal = (p.sell_price || 0) * (p.qty || 1);
+          const discountPct = p.discount || 0;
+          const grossTotal  = (p.sell_price || 0) * (p.qty || 1);
+          const discountAmt = grossTotal * (discountPct / 100);
+          const lineTotal   = grossTotal - discountAmt;
           partsTotal += lineTotal;
+          const discLabel = discountPct > 0 ? `${discountPct}%` : '-';
           let px2 = margin;
           textCenter(String(i + 1), px2, y, pColSno, { size: 8.5, rowH }); px2 += pColSno;
-          textCenter(p.part_name || '', px2, y, pColDesc, { size: 8, rowH }); px2 += pColDesc;
+          text(p.part_name || '', px2 + 6, y, { size: 8, rowH, maxW: pColDesc - 12 }); px2 += pColDesc;
           textCenter(String(p.qty || 1), px2, y, pColQty, { size: 8.5, rowH }); px2 += pColQty;
           textRight(num(p.sell_price), px2, y, pColUnit - 4, { size: 8.5, rowH }); px2 += pColUnit;
-          textCenter('-', px2, y, pColDisc, { size: 8.5, color: grey, rowH }); px2 += pColDisc;
+          textCenter(discLabel, px2, y, pColDisc, { size: 8.5, color: discountPct > 0 ? rgb(0.85, 0.60, 0.10) : grey, rowH }); px2 += pColDisc;
           textRight(num(lineTotal), px2, y, pColNet - 4, { size: 8.5, font: boldFont, rowH });
         }
         y -= rowH;
@@ -316,7 +349,7 @@ window.ProTechPDF = {
       const lHeaderH = 17;
       const laborHeaderCols = [
         { w: lColSno,  label: 'S.NO.' },
-        { w: lColDesc, label: 'SERVICE DESCRIPTION' },
+        { w: lColDesc, label: 'SERVICE DESCRIPTION', align: 'start' },
         { w: lColHrs,  label: 'HOURS' },
         { w: lColRate, label: 'UNIT PRICE' },
         { w: lColNet,  label: 'NET AMOUNT' },
@@ -326,7 +359,11 @@ window.ProTechPDF = {
         let lx = margin;
         laborHeaderCols.forEach(col => {
           drawRect(lx, y, col.w, lHeaderH, darkBlue);
-          textCenter(col.label, lx, y, col.w, { font: boldFont, size: 7.5, color: white, rowH: lHeaderH });
+          if (col.align === 'start') {
+            text(col.label, lx + 6, y, { font: boldFont, size: 7.5, color: white, rowH: lHeaderH });
+          } else {
+            textCenter(col.label, lx, y, col.w, { font: boldFont, size: 7.5, color: white, rowH: lHeaderH });
+          }
           lx += col.w;
         });
         y -= lHeaderH;
@@ -351,7 +388,7 @@ window.ProTechPDF = {
           laborTotal += lineTotal;
           let lx2 = margin;
           textCenter(String(i + 1), lx2, y, lColSno, { size: 8.5, rowH }); lx2 += lColSno;
-          textCenter(l.description || '', lx2, y, lColDesc, { size: 8, rowH }); lx2 += lColDesc;
+          text(l.description || '', lx2 + 6, y, { size: 8, rowH, maxW: lColDesc - 12 }); lx2 += lColDesc;
           textCenter(String(l.hours || ''), lx2, y, lColHrs, { size: 8.5, rowH }); lx2 += lColHrs;
           textRight(num(l.rate), lx2, y, lColRate - 4, { size: 8.5, rowH }); lx2 += lColRate;
           textRight(num(lineTotal), lx2, y, lColNet - 4, { font: boldFont, size: 8.5, rowH });
@@ -387,21 +424,24 @@ window.ProTechPDF = {
       drawTotalRow('NET AMOUNT TO PAY', lkr(grandTotal), darkBlue, golden, true);
 
       // ═══════════════════════════════════════════════════════════
-      // 8. SIGNATURE BOXES
+      // 8. SIGNATURE SECTION
       // ═══════════════════════════════════════════════════════════
-      const sigY = BOTTOM_MARGIN + 55;
-      const sigW = 155;
-      const sigH = 32;
+      const sigY = BOTTOM_MARGIN + 62;
+      const sigW = 150;
+      const sig1X = margin;
+      const sig2X = margin + sigW + 24;
+      const dottedStr = '..........................................';
 
-      drawRect(margin, sigY, sigW, sigH, rgb(0.93, 0.93, 0.93));
-      drawRectBorder(margin, sigY, sigW, sigH, rgb(0.6, 0.6, 0.6));
-      text('......................................', margin + 18, sigY - 8, { color: grey, size: 8 });
-      textCenter('Prepared By', margin, sigY - 22, sigW, { font: boldFont, size: 8.5, color: black });
+      // Prepared By (centered dotted line + label)
+      textCenter(dottedStr, sig1X, sigY - 8, sigW, { color: grey, size: 8.5 });
+      textCenter('Prepared By', sig1X, sigY - 22, sigW, { font: boldFont, size: 8.5, color: black });
 
-      drawRect(margin + sigW + 20, sigY, sigW, sigH, rgb(0.93, 0.93, 0.93));
-      drawRectBorder(margin + sigW + 20, sigY, sigW, sigH, rgb(0.6, 0.6, 0.6));
-      text('......................................', margin + sigW + 38, sigY - 8, { color: grey, size: 8 });
-      textCenter('Authorised By', margin + sigW + 20, sigY - 22, sigW, { font: boldFont, size: 8.5, color: black });
+      // Authorised By (centered dotted line + label)
+      textCenter(dottedStr, sig2X, sigY - 8, sigW, { color: grey, size: 8.5 });
+      textCenter('Authorised By', sig2X, sigY - 22, sigW, { font: boldFont, size: 8.5, color: black });
+
+      // Thank you message at the bottom of Page 1
+      drawThankYou(70, 9.5, 8);
 
       // ═══════════════════════════════════════════════════════════
       // PAGE 2 – SPECIAL NOTES & SERVICE CHECKLIST
@@ -512,6 +552,9 @@ window.ProTechPDF = {
         'CHECK , RESET AND INITIALIZE EFI SYSTEM',
         'CHEMICALS :- INJECTOR / TROTLE BODY CLEANER, ENGINE CONDITIONER, BRAKE PARTS CLEANER....'
       ]);
+
+      // Thank you message at the bottom of the PDF
+      drawThankYou(76, 11, 9.5);
 
       // ─── SAVE & DOWNLOAD ────────────────────────────────────────
       const pdfBytes = await doc.save();
