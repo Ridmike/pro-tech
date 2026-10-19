@@ -6,15 +6,15 @@ let mainWindow = null;
 
 // Parse .env file securely with production fallbacks
 function getFirebaseEnvConfig() {
-  // Built-in default Firebase config so the packaged desktop app works out-of-the-box
+  // Default empty Firebase config (credentials are loaded from .env)
   const config = {
-    apiKey: 'AIzaSyAvUN-EcCtNhzF9O3XMb2y5wVMpebiDrQU',
-    authDomain: 'protec-automobile.firebaseapp.com',
-    projectId: 'protec-automobile',
-    storageBucket: 'protec-automobile.firebasestorage.app',
-    messagingSenderId: '665325317626',
-    appId: '1:665325317626:web:17564089c52940bce9c843',
-    measurementId: 'G-ZNJSJ5VNSX'
+    apiKey: '',
+    authDomain: '',
+    projectId: '',
+    storageBucket: '',
+    messagingSenderId: '',
+    appId: '',
+    measurementId: ''
   };
 
   // Potential locations for .env:
